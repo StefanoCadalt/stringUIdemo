@@ -35,20 +35,23 @@ public:
         if (doPluckForNextBuffer.compareAndSetBool(0, 1))
             exciteInternalBuffer();
 
-        //damping
         float dampCoeff = currentDamping * 0.5f;
+        float feedbackGain = 0.9f + currentSustain * 0.099f;
 
         for (int i = 0; i < numSamples; ++i)
         {
             auto nextPos = (pos + 1) % currentDelayLength;
-            
-            //filtraggio damping
+
+            // 1) filtro di damping (passa-basso)
             float filtered = delayLine[pos] * (1.0f - dampCoeff) + delayLine[nextPos] * dampCoeff;
 
-            //sustain: feedback gain tra 0.9f e 0.099f
-            float feedbackGain = 0.9f + currentSustain * 0.099f;
+            // 2) allpass per il fractional delay (intonazione fine)
+            float allpassOut = allpassCoeff * filtered + allpassInputPrev - allpassCoeff * allpassOutputPrev;
+            allpassInputPrev = filtered;
+            allpassOutputPrev = allpassOut;
 
-            delayLine[nextPos] = filtered * feedbackGain;
+            // 3) feedback nel buffer
+            delayLine[nextPos] = allpassOut * feedbackGain;
 
             outBuffer[i] += delayLine[pos];
             pos = nextPos;
@@ -57,10 +60,19 @@ public:
 
     void setFrequency(double newFrequencyInHz)
     {
-        currentDelayLength = (size_t)juce::roundToInt(fs / newFrequencyInHz);
-        currentDelayLength = juce::jlimit((size_t)2, maxDelayLength, currentDelayLength);
-        pos = 0; // reset posizione per evitare artefatti
+        double exactDelay = fs / newFrequencyInHz;
+        size_t N = (size_t)std::floor(exactDelay);
+        float frac = (float)(exactDelay - (double)N);
 
+        // l'allpass gestisce la frazione, quindi il buffer usa solo la parte intera
+        currentDelayLength = juce::jlimit((size_t)2, maxDelayLength, N);
+
+        // coefficiente allpass (Jaffe-Smith)
+        allpassCoeff = (1.0f - frac) / (1.0f + frac);
+
+        pos = 0;
+        allpassInputPrev = 0.0f;
+        allpassOutputPrev = 0.0f;
         generateExcitation();
     }
 
@@ -115,6 +127,10 @@ private:
     float currentHardness = 0.5f;
     float currentDamping = 0.5f;
     float currentSustain = 0.8f;
+
+    float allpassCoeff = 0.0f;
+    float allpassInputPrev = 0.0f;
+    float allpassOutputPrev = 0.0f;
 
     juce::Atomic<int> doPluckForNextBuffer;
     std::vector<float> excitationSample, delayLine;
