@@ -729,7 +729,7 @@ void StringUIdemoAudioProcessorEditor::applicaPreset(int presetId)
         setParam("hardness", 0.80f); setParam("damping", 100.0f); setParam("sustain", 100.0f);
         setParam("delayOn", 1.0f); setParam("distOn", 1.0f); setParam("revOn", 1.0f);
 
-        setTuning(70, 65, 61, 56, 51, 46);
+        setTuning(76, 71, 67, 62, 57, 52);
         break;
     case 4: // Bass
         setParam("drive", 1.44f); setParam("gain", 0.45f);
