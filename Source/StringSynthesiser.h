@@ -46,9 +46,9 @@ public:
             float filtered = delayLine[pos] * (1.0f - dampCoeff) + delayLine[nextPos] * dampCoeff;
 
             // 2) allpass per il fractional delay (intonazione fine)
-            float allpassOut = allpassCoeff * filtered + allpassInputPrev - allpassCoeff * allpassOutputPrev;
-            allpassInputPrev = filtered;
-            allpassOutputPrev = allpassOut;
+            float allpassOut = allpassCoeff * filtered + allpassInputPrec - allpassCoeff * allpassOutputPrec;
+            allpassInputPrec = filtered; // aggiorno valore input precedente allpass
+            allpassOutputPrec = allpassOut; // aggiorno valore output precedente allpass
 
             // 3) feedback nel buffer
             delayLine[nextPos] = allpassOut * feedbackGain;
@@ -71,8 +71,8 @@ public:
         allpassCoeff = (1.0f - frac) / (1.0f + frac);
 
         pos = 0;
-        allpassInputPrev = 0.0f;
-        allpassOutputPrev = 0.0f;
+        allpassInputPrec = 0.0f;
+        allpassOutputPrec = 0.0f;
         generateExcitation();
     }
 
@@ -129,8 +129,8 @@ private:
     float currentSustain = 0.8f;
 
     float allpassCoeff = 0.0f;
-    float allpassInputPrev = 0.0f;
-    float allpassOutputPrev = 0.0f;
+    float allpassInputPrec = 0.0f;
+    float allpassOutputPrec = 0.0f;
 
     juce::Atomic<int> doPluckForNextBuffer;
     std::vector<float> excitationSample, delayLine;
