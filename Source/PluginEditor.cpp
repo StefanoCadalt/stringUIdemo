@@ -6,6 +6,9 @@ StringUIdemoAudioProcessorEditor::StringUIdemoAudioProcessorEditor(StringUIdemoA
     : AudioProcessorEditor(&p), audioProcessor(p)
 {
 
+	juce::Typeface::Ptr customFont = juce::Typeface::createSystemTypefaceFor(BinaryData::ShareTechMonoRegular_ttf, BinaryData::ShareTechMonoRegular_ttfSize);
+    juce::LookAndFeel::getDefaultLookAndFeel().setDefaultSansSerifTypeface(customFont);
+
     #pragma region Visibilita sfondo corde
         // Corde visive
         for (int i = 0; i < StringUIdemoAudioProcessor::numStrings; ++i)
@@ -67,7 +70,7 @@ StringUIdemoAudioProcessorEditor::StringUIdemoAudioProcessorEditor(StringUIdemoA
     addAndMakeVisible(notaSuonataLabel);
     notaSuonataLabel.setText("Nota", juce::NotificationType::dontSendNotification);
     notaSuonataLabel.setFont(juce::FontOptions(13.0f));
-    notaSuonataLabel.setColour(juce::Label::textColourId, juce::Colours::white);
+    notaSuonataLabel.setColour(juce::Label::textColourId, juce::Colour(0xFF20D065));
     notaSuonataLabel.setJustificationType(juce::Justification::centred);
 
     #pragma region Setup Preset Menu
@@ -104,21 +107,21 @@ StringUIdemoAudioProcessorEditor::StringUIdemoAudioProcessorEditor(StringUIdemoA
             for (int i = 0; i < numSezioni; ++i)
             {
                 titoloSezione[i].setText(nomiSezioni[i], juce::dontSendNotification);
-                titoloSezione[i].setJustificationType(juce::Justification::centred);
-                titoloSezione[i].setColour(juce::Label::textColourId, juce::Colours::grey);
+                titoloSezione[i].setJustificationType(juce::Justification::centredLeft);
+                titoloSezione[i].setColour(juce::Label::textColourId, juce::Colour(0xFF20D065).withAlpha(0.4f));
                 addAndMakeVisible(titoloSezione[i]);
             }
     #pragma endregion
 
-    #pragma region Setup monopole
+    #pragma region Setup manopole
                 // Definizione dei nomi delle manopole (Aggiunte le 3 del phaser in fondo)
                 juce::String nomiManopole[numManopole] = {
                     "Time", "Feedback",           // Delay (0, 1)
                     "Drive", "Gain",              // Distortion (2, 3)
                     "Hardness", "Damping", "Sustain", // Physical (4, 5, 6)
-                    "Rev Mix", "Rev Size",        // Reverb (7, 8)
+                    "Mix", "Size",        // Reverb (7, 8)
                     "Master",                     // Master Section (9)
-                    "P. Rate", "P. Depth", "P. Mix" // Phaser (10, 11, 12)
+                    "Rate", "Depth", "Mix" // Phaser (10, 11, 12)
                 };
 
                 // Manopole
@@ -129,7 +132,6 @@ StringUIdemoAudioProcessorEditor::StringUIdemoAudioProcessorEditor(StringUIdemoA
                     manopolaEffetto[i].setColour(juce::Slider::textBoxBackgroundColourId, juce::Colours::transparentBlack);
                     manopolaEffetto[i].setColour(juce::Slider::textBoxOutlineColourId, juce::Colours::transparentBlack);
                     manopolaEffetto[i].setColour(juce::Slider::textBoxTextColourId, juce::Colours::white);
-
                     // Sezione per le unità di misura
                     if (nomiManopole[i] == "Time") {
                         manopolaEffetto[i].setTextValueSuffix(" s");
@@ -148,12 +150,12 @@ StringUIdemoAudioProcessorEditor::StringUIdemoAudioProcessorEditor(StringUIdemoA
 
                     titoloManopolaEffetto[i].setText(nomiManopole[i], juce::dontSendNotification);
                     titoloManopolaEffetto[i].setJustificationType(juce::Justification::centred);
-                    titoloManopolaEffetto[i].setColour(juce::Label::textColourId, juce::Colours::white);
+                    titoloManopolaEffetto[i].setColour(juce::Label::textColourId, juce::Colours::grey);
                     addAndMakeVisible(titoloManopolaEffetto[i]);
                 }
     #pragma endregion
 
-    setSize(1280, 720);
+    setSize(1152, 648);
 
     #pragma region Timer
 
@@ -170,10 +172,15 @@ StringUIdemoAudioProcessorEditor::StringUIdemoAudioProcessorEditor(StringUIdemoA
         for (int i = 0; i < 4; ++i)
         {
             bypassButtons[i]->setClickingTogglesState(true);
-            // Colore da spento (grigio scuro)
-            bypassButtons[i]->setColour(juce::TextButton::buttonColourId, juce::Colour(0xFF242424));
-            // Colore da acceso (viola neon)
-            bypassButtons[i]->setColour(juce::TextButton::buttonOnColourId, juce::Colours::purple);
+
+            // 1. Diciamo al bottone di usare la nostra classe Custom
+            bypassButtons[i]->setLookAndFeel(&stilePomello);
+
+            // 2. Colore del testo da SPENTO (verde attenuato)
+            bypassButtons[i]->setColour(juce::TextButton::textColourOffId, juce::Colour(0xFF20D065).withAlpha(0.5f));
+
+            // 3. Colore del testo da ACCESO (ciano ghiaccio)
+            bypassButtons[i]->setColour(juce::TextButton::textColourOnId, juce::Colour(0xFF00D4FF));
 
             addAndMakeVisible(bypassButtons[i]);
         }
@@ -294,27 +301,42 @@ void StringUIdemoAudioProcessorEditor::timerCallback()
 
 void StringUIdemoAudioProcessorEditor::paint(juce::Graphics& g)
 {
-    g.fillAll(juce::Colour(0xFF201513));
+    // Sfondo nero assoluto stile cruscotto digitale
+    g.fillAll(juce::Colour(0xFF08080A));
 
-    SetTitle(g);
+    //SetTitle(g);
     SetLineaSeparatrice(g);
     SetStrings(g);
     SetSeparationFret(g);
 
     #pragma region Disegno suddivisione delle aree
-    g.setColour(juce::Colour(0xFF4D453A).withAlpha(0.4f));
+        juce::Colour verdeNeon = juce::Colour(0xFF20D065);
 
-    // Riempiamo le aree con rettangoli arrotondati
-    // Nota: fillRoundedRectangle richiede coordinate float, quindi usiamo .toFloat()
-    float cornerRadius = 8.0f; // Smussatura degli angoli (più è alto, più è rotondo)
+        // Sfondo interno dei pannelli (nero appena illuminato dal fosforo)
+        g.setColour(verdeNeon.withAlpha(0.01f));
 
-    g.fillRoundedRectangle(areaOscilloscopio.reduced(4).toFloat(), cornerRadius);
-    g.fillRoundedRectangle(areaMaster.reduced(4).toFloat(), cornerRadius);
-    g.fillRoundedRectangle(areaParametriFisici.reduced(4).toFloat(), cornerRadius);
-    g.fillRoundedRectangle(areaDelay.reduced(4).toFloat(), cornerRadius);
-    g.fillRoundedRectangle(areaDistortion.reduced(4).toFloat(), cornerRadius);
-    g.fillRoundedRectangle(areaReverb.reduced(4).toFloat(), cornerRadius);
-    g.fillRoundedRectangle(areaPhaser.reduced(4).toFloat(), cornerRadius);
+        // Angoli molto più secchi e hardware (2.0f invece di 8.0f)
+        float cornerRadius = 2.0f;
+
+        g.fillRoundedRectangle(areaOscilloscopio.reduced(4).toFloat(), cornerRadius);
+        g.fillRoundedRectangle(areaMaster.reduced(4).toFloat(), cornerRadius);
+        g.fillRoundedRectangle(areaParametriFisici.reduced(4).toFloat(), cornerRadius);
+        g.fillRoundedRectangle(areaDelay.reduced(4).toFloat(), cornerRadius);
+        g.fillRoundedRectangle(areaDistortion.reduced(4).toFloat(), cornerRadius);
+        g.fillRoundedRectangle(areaReverb.reduced(4).toFloat(), cornerRadius);
+        g.fillRoundedRectangle(areaPhaser.reduced(4).toFloat(), cornerRadius);
+
+        // Tracciamo i bordi "laser" luminosi per ogni pannello
+        g.setColour(verdeNeon.withAlpha(0.1f));
+        float lineThickness = 1.0f; // Linea sottilissima e precisa
+
+        g.drawRoundedRectangle(areaOscilloscopio.reduced(4).toFloat(), cornerRadius, lineThickness);
+        g.drawRoundedRectangle(areaMaster.reduced(4).toFloat(), cornerRadius, lineThickness);
+        g.drawRoundedRectangle(areaParametriFisici.reduced(4).toFloat(), cornerRadius, lineThickness);
+        g.drawRoundedRectangle(areaDelay.reduced(4).toFloat(), cornerRadius, lineThickness);
+        g.drawRoundedRectangle(areaDistortion.reduced(4).toFloat(), cornerRadius, lineThickness);
+        g.drawRoundedRectangle(areaReverb.reduced(4).toFloat(), cornerRadius, lineThickness);
+        g.drawRoundedRectangle(areaPhaser.reduced(4).toFloat(), cornerRadius, lineThickness);
     #pragma endregion
 
     #pragma region Disegno Volume Meter
@@ -424,7 +446,7 @@ void StringUIdemoAudioProcessorEditor::resized()
         notaSuonataLabel.setFont(juce::FontOptions(12.0f * scale));
 
         // Divisione Principale: 1/3 a Sinistra, 2/3 a Destra
-        auto leftArea = area.removeFromLeft(area.getWidth() / 3);
+        auto leftArea = area.removeFromLeft(area.getWidth() / 5);
         auto rightArea = area;
 
         // Sub-divisione Sinistra (Oscilloscopio e Master)
@@ -463,13 +485,16 @@ void StringUIdemoAudioProcessorEditor::resized()
 
         // Ritagliamo 35 pixel dall'alto di ogni area per far spazio ai titoli
         int titleHeight = 35 * scale;
-        titoloSezione[0].setBounds(workOsc.removeFromTop(titleHeight));
-        titoloSezione[1].setBounds(workMaster.removeFromTop(titleHeight));
-        titoloSezione[2].setBounds(workPhys.removeFromTop(titleHeight));
-        titoloSezione[3].setBounds(workDelay.removeFromTop(titleHeight).reduced(30 * scale, 0));
-        titoloSezione[4].setBounds(workDist.removeFromTop(titleHeight).reduced(30 * scale, 0));
-        titoloSezione[5].setBounds(workPhaser.removeFromTop(titleHeight).reduced(30 * scale, 0));
-        titoloSezione[6].setBounds(workRev.removeFromTop(titleHeight).reduced(30 * scale, 0));
+        // Margine sinistro per i titoli delle sezioni
+		int leftMargin = 15 * scale; 
+
+        titoloSezione[0].setBounds(workOsc.removeFromTop(titleHeight).withTrimmedLeft(leftMargin));
+        titoloSezione[1].setBounds(workMaster.removeFromTop(titleHeight).withTrimmedLeft(leftMargin));
+        titoloSezione[2].setBounds(workPhys.removeFromTop(titleHeight).withTrimmedLeft(leftMargin));
+        titoloSezione[3].setBounds(workDelay.removeFromTop(titleHeight).withTrimmedLeft(leftMargin));
+        titoloSezione[4].setBounds(workDist.removeFromTop(titleHeight).withTrimmedLeft(leftMargin));
+        titoloSezione[5].setBounds(workPhaser.removeFromTop(titleHeight).withTrimmedLeft(leftMargin));
+        titoloSezione[6].setBounds(workRev.removeFromTop(titleHeight).withTrimmedLeft(leftMargin));
 
         // Scaliamo il font dei titoli
         for (int i = 0; i < numSezioni; ++i)
@@ -502,6 +527,7 @@ void StringUIdemoAudioProcessorEditor::resized()
 
         // Master Volume (Cella 9)
         celle[9] = workMaster.reduced(5 * scale, 5 * scale);
+		celle[9].removeFromRight(24 * scale); // Rimuoviamo lo spazio per il volume meter
 
         // Phaser (Celle 10, 11, 12)
         auto phasArea = workPhaser.reduced(5 * scale, 5 * scale);
@@ -547,12 +573,24 @@ void StringUIdemoAudioProcessorEditor::resized()
     #pragma endregion
 
     #pragma region Posizionamento Volume Meter
-            // Prendiamo uno spazio a destra della manopola Master
-            auto meterBox = celle[9].removeFromRight(15 * scale).reduced(0, 10 * scale).translated(-25 * scale, 0);
+        // 1. Prendiamo i riferimenti di manopola e del suo nome ("Master")
+        auto masterBounds = manopolaEffetto[9].getBounds();
+        auto nameBounds = titoloManopolaEffetto[9].getBounds();
 
-            // Dividiamo in due barrette (Left e Right) con 2 pixel di spazio in mezzo
-            meterLeftArea = meterBox.removeFromLeft(meterBox.getWidth() / 2 - 1);
-            meterRightArea = meterBox.removeFromRight(meterLeftArea.getWidth());
+        // 2. Partiamo dall'inizio del nome e arriviamo fino alla fine del bounds della manopola (che include già la textbox)
+        int startY = nameBounds.getY();
+        int endY = masterBounds.getBottom();
+        int altezzaMeter = endY - startY;
+
+        // 3. Creiamo il box dei meter posizionato a destra della manopola
+        auto meterBox = juce::Rectangle<int>(masterBounds.getRight() + (12 * scale),
+            startY,
+            14 * scale,
+            altezzaMeter);
+
+        // 4. Dividiamo in due barrette (Left e Right)
+        meterLeftArea = meterBox.removeFromLeft(meterBox.getWidth() / 2 - 1);
+        meterRightArea = meterBox.removeFromRight(meterLeftArea.getWidth());
     #pragma endregion
 
     #pragma region Sezione oscilloscopio
@@ -565,7 +603,7 @@ void StringUIdemoAudioProcessorEditor::resized()
             audioProcessor.puntatoreOscilloscopio = &oscilloscopio;
 
             // Colori: Sfondo e Colore dell'Onda
-            oscilloscopio.setColours(juce::Colour(0xFF201513), juce::Colours::cyan);
+            oscilloscopio.setColours(juce::Colour(0xFF08080A), juce::Colour(0xFF20D065));
             oscilloscopio.setOpaque(true); // Per migliorare le prestazioni, dato che disegniamo tutto lo sfondo
             addAndMakeVisible(oscilloscopio);
 
@@ -655,7 +693,7 @@ void StringUIdemoAudioProcessorEditor::SetTitle(juce::Graphics& g)
 {
     float scale = (float)getWidth() / 750.0f;
 
-    g.setColour(juce::Colours::white.withAlpha(0.85f));
+    g.setColour(juce::Colours::white.withAlpha(0.9f));
     // Scaliamo il font del titolo (da 18 a 18 * scale)
     g.setFont(juce::FontOptions(18.0f * scale, juce::Font::bold));
 

@@ -4,6 +4,8 @@
               addUsingNamespaceToJuceHeader="0" jucerFormatVersion="1">
   <MAINGROUP id="hOrcJ1" name="stringUIdemo">
     <GROUP id="{A79DE33B-E1A9-48C5-ECE5-23BB030320DC}" name="Source">
+      <FILE id="I1FuT6" name="ShareTechMono-Regular.ttf" compile="0" resource="1"
+            file="../Share_Tech_Mono/ShareTechMono-Regular.ttf"/>
       <FILE id="GL192j" name="KnobStyle.h" compile="0" resource="0" file="Source/KnobStyle.h"/>
       <FILE id="YSYNoL" name="StringSynthesiser.h" compile="0" resource="0"
             file="Source/StringSynthesiser.h"/>

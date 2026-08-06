@@ -19,54 +19,69 @@ class KnobStyle  : public juce::LookAndFeel_V4
 {
 public:
     void drawRotarySlider(juce::Graphics& g,
-            int x, int y, int width, int height,
-            float sliderPos, //indica dove punta l'indicatore
-            float rotaryStartAngle,
-            float rotaryEndAngle,
-            juce::Slider&) override 
+        int x, int y, int width, int height,
+        float sliderPos,
+        float rotaryStartAngle,
+        float rotaryEndAngle,
+        juce::Slider&) override
     {
-        
-        
         auto radius = juce::jmin(width, height) / 2.0f - 10.0f;
         auto centreX = x + width * 0.5f;
         auto centreY = y + height * 0.5f;
 
-        // Angolo del knob, per sapere verso dove punta
-        auto angle = rotaryStartAngle
-            + sliderPos * (rotaryEndAngle - rotaryStartAngle);
+        auto angle = rotaryStartAngle + sliderPos * (rotaryEndAngle - rotaryStartAngle);
 
-        // Cerchio principale
-        g.setColour(juce::Colours::purple);
-        //disegno il cerchio interno
-        g.fillEllipse(centreX - radius,
-            centreY - radius,
-            radius * 2.0f,
-            radius * 2.0f);
+        // Colore Ciano Ghiaccio
+        juce::Colour cianoGhiaccio = juce::Colour(0xFF00D4FF);
 
-        // Bordo
-        g.setColour(juce::Colours::white);
-        //disegno il cerchio esterno
-        g.drawEllipse(centreX - radius,
-            centreY - radius,
-            radius * 2.0f,
-            radius * 2.0f,
-            3.0f);
+        // Sfondo interno trasparente/scuro (buco)
+        g.setColour(juce::Colour(0xFF08080A));
+        g.fillEllipse(centreX - radius, centreY - radius, radius * 2.0f, radius * 2.0f);
 
-        // Linea indicatore
+        // Bordo dell'anello: usa un alpha basso per non appesantire (es. 0.3f)
+        g.setColour(cianoGhiaccio.withAlpha(0.3f));
+        g.drawEllipse(centreX - radius, centreY - radius, radius * 2.0f, radius * 2.0f, 2.5f);
+
+        // Linea indicatore (Il "LED" che segna il valore)
         juce::Path p;
+        auto pointerLength = radius * 0.85f;
+        auto pointerThickness = 3.0f;
 
-        auto pointerLength = radius * 0.8f;
-        auto pointerThickness = 4.0f;
+        p.addRectangle(-pointerThickness * 0.5f, -radius, pointerThickness, pointerLength);
 
-        //creo la linea del knob
-        p.addRectangle(-pointerThickness * 0.5f,
-            -radius,
-            pointerThickness,
-            pointerLength);
-
-        g.setColour(juce::Colours::white);
-
-        //permetto di ruotare la linea
+        // Disegno l'indicatore con il ciano pieno e luminoso
+        g.setColour(cianoGhiaccio);
         g.fillPath(p, juce::AffineTransform::rotation(angle).translated(centreX, centreY));
+    }
+
+
+
+    void drawButtonBackground(juce::Graphics& g,
+        juce::Button& button,
+        const juce::Colour& backgroundColour,
+        bool shouldDrawButtonAsHighlighted,
+        bool shouldDrawButtonAsDown) override
+    {
+        auto bounds = button.getLocalBounds().toFloat();
+        float cornerSize = 1.0f; // Angoli quasi squadrati, molto tecnici
+
+        if (button.getToggleState())
+        {
+            // STATO ON: Sfondo leggermente illuminato, bordo Ciano Ghiaccio acceso
+            g.setColour(juce::Colour(0xFF00D4FF).withAlpha(0.15f));
+            g.fillRoundedRectangle(bounds, cornerSize);
+
+            g.setColour(juce::Colour(0xFF00D4FF));
+            g.drawRoundedRectangle(bounds, cornerSize, 1.5f);
+        }
+        else
+        {
+            // STATO OFF: Sfondo nero totale, bordo verde molto tenue (come i pannelli)
+            g.setColour(juce::Colour(0xFF08080A));
+            g.fillRoundedRectangle(bounds, cornerSize);
+
+            g.setColour(juce::Colour(0xFF20D065).withAlpha(0.2f));
+            g.drawRoundedRectangle(bounds, cornerSize, 1.0f);
+        }
     }
 };
