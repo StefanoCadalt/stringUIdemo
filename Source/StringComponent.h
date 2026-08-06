@@ -51,17 +51,12 @@ public:
     /// <param name="g"></param>
     void paint(juce::Graphics& g) override
     {
-        // 1. Disegno il "bagliore" (Glow)
-        // Prendo il colore originale e gli abbasso l'opacità
-        g.setColour(colour.withAlpha(0.3f));
-        // Disegno la linea molto spessa (6.0f)
-        g.strokePath(generateStringPath(), juce::PathStrokeType(6.0f));
 
-        // 2. Disegno il "nucleo" luminoso
+        // Disegno il "nucleo" luminoso
         // Colore pieno
         g.setColour(colour);
         // Linea sottile e tagliente (1.5f)
-        g.strokePath(generateStringPath(), juce::PathStrokeType(1.5f));
+        g.strokePath(generateStringPath(), juce::PathStrokeType(2.5f));
     }
 
     /// <summary>

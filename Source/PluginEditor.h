@@ -19,12 +19,12 @@ public:
     static juce::Colour stringColour(int index)
     {
         const juce::Colour colours[6] = {
-            juce::Colour(0xFF008000),  // E2
-            juce::Colour(0xFF00CF00),  // A2
-            juce::Colour(0xFF1FFF1F),  // D3
-            juce::Colour(0xFF6FFF6F),  // G3
-            juce::Colour(0xFF96FF96),  // B3
-            juce::Colour(0xFFCCFFCC)   // E4
+            juce::Colour(0xFF004A15),  // E2: Verde molto scuro e profondo
+            juce::Colour(0xFF007520),  // A2
+            juce::Colour(0xFF00A830),  // D3
+            juce::Colour(0xFF00D23A),  // G3
+            juce::Colour(0xFF00FA40),  // B3: Verde puro
+            juce::Colour(0xFF28FF5A)   // E4: Verde luminoso, ma assolutamente non bianco
         };
         return colours[index % 6];
     }

@@ -117,6 +117,9 @@ private:
 	std::atomic<float>* delayOnParameter = nullptr;
 	std::atomic<float>* revOnParameter = nullptr;
 
+    // Buffer temporaneo per "pompare" l'onda visiva senza alterare l'audio
+    juce::AudioBuffer<float> visualBuffer;
+
     #pragma endregion
 
     // Modulo Riverbero di JUCE

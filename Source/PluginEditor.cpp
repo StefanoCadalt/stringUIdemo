@@ -18,12 +18,17 @@ StringUIdemoAudioProcessorEditor::StringUIdemoAudioProcessorEditor(StringUIdemoA
         }
     #pragma endregion
 
-    #pragma region accordatura corde setup
+    #pragma region Setup accordatura corde
         // Controlli tuning (uno per corda)
         for (int i = 0; i < StringUIdemoAudioProcessor::numStrings; ++i)
         {
             // Pulsante [−]
             auto* btnDown = tuningDownButtons.add(new juce::TextButton("-"));
+
+            // AGGIUNTE STILE BERSAGLIO:
+            btnDown->setLookAndFeel(&stilePomello);
+            btnDown->setColour(juce::TextButton::textColourOffId, juce::Colour(0xFF20D065).withAlpha(0.7f));
+
             // quando premo il pulsante...
             btnDown->onClick = [this, i]()
                 {
@@ -42,6 +47,11 @@ StringUIdemoAudioProcessorEditor::StringUIdemoAudioProcessorEditor(StringUIdemoA
 
             // Pulsante [+]
             auto* btnUp = tuningUpButtons.add(new juce::TextButton("+"));
+
+            // AGGIUNTE STILE BERSAGLIO:
+            btnUp->setLookAndFeel(&stilePomello);
+            btnUp->setColour(juce::TextButton::textColourOffId, juce::Colour(0xFF20D065).withAlpha(0.7f));
+
             //quando premo il pulsante...
             btnUp->onClick = [this, i]()
                 {
@@ -50,11 +60,12 @@ StringUIdemoAudioProcessorEditor::StringUIdemoAudioProcessorEditor(StringUIdemoA
                     updateTuningLabel(i);
                 };
             addAndMakeVisible(btnUp);
-
-        }  
+        }
 
         // Pulsante Reset
         resetTuningButton.setButtonText("Reset");
+        resetTuningButton.setLookAndFeel(&stilePomello); // Applica il tuo stile custom
+        resetTuningButton.setColour(juce::TextButton::textColourOffId, juce::Colour(0xFF20D065).withAlpha(0.7f));
         resetTuningButton.onClick = [this]()
             {
                 audioProcessor.resetTuning();
@@ -68,10 +79,11 @@ StringUIdemoAudioProcessorEditor::StringUIdemoAudioProcessorEditor(StringUIdemoA
 
     // Label nota suonata
     addAndMakeVisible(notaSuonataLabel);
-    notaSuonataLabel.setText("Nota", juce::NotificationType::dontSendNotification);
+    notaSuonataLabel.setText("Note", juce::NotificationType::dontSendNotification);
     notaSuonataLabel.setFont(juce::FontOptions(13.0f));
     notaSuonataLabel.setColour(juce::Label::textColourId, juce::Colour(0xFF20D065));
-    notaSuonataLabel.setJustificationType(juce::Justification::centred);
+    notaSuonataLabel.setJustificationType(juce::Justification::centredLeft);
+    notaSuonataLabel.setBorderSize(juce::BorderSize<int>(0, 0, 0, 0));
 
     #pragma region Setup Preset Menu
         // Setup preset menu
@@ -86,9 +98,10 @@ StringUIdemoAudioProcessorEditor::StringUIdemoAudioProcessorEditor(StringUIdemoA
 		applicaPreset(1); // Applico il preset di default all'avvio
 
 		// Setup dei colori e dell'allineamento del testo
-        presetMenu.setColour(juce::ComboBox::backgroundColourId, juce::Colour(0xFF242424));
-        presetMenu.setColour(juce::ComboBox::textColourId, juce::Colours::white);
-        presetMenu.setColour(juce::ComboBox::outlineColourId, juce::Colour(0xFF4D453A));
+        presetMenu.setColour(juce::ComboBox::backgroundColourId, juce::Colours::transparentBlack);
+        presetMenu.setColour(juce::ComboBox::textColourId, juce::Colour(0xFF20D065).withAlpha(0.7f));
+        presetMenu.setColour(juce::ComboBox::outlineColourId, juce::Colour(0xFF20D065).withAlpha(0.3f));
+        presetMenu.setColour(juce::ComboBox::arrowColourId, juce::Colour(0xFF20D065).withAlpha(0.5f));
         presetMenu.setJustificationType(juce::Justification::centred);
 
 		// Impostiamo il preset di default come selezionato all'avvio
@@ -101,14 +114,14 @@ StringUIdemoAudioProcessorEditor::StringUIdemoAudioProcessorEditor(StringUIdemoA
     #pragma region Setup Titoli Sezioni
             // Definiamo i nomi delle 7 macro-aree (Ho inserito PHASER prima di REVERB)
             juce::String nomiSezioni[numSezioni] = {
-                "OSCILLOSCOPIO", "MASTER VOLUME", "PARAMETRI FISICI", "DELAY", "DISTORTION", "PHASER", "REVERB"
+                "OSCILLOSCOPE", "MASTER VOLUME", "PHYSICAL PARAMETERS", "DELAY", "DISTORTION", "PHASER", "REVERB"
             };
 
             for (int i = 0; i < numSezioni; ++i)
             {
                 titoloSezione[i].setText(nomiSezioni[i], juce::dontSendNotification);
                 titoloSezione[i].setJustificationType(juce::Justification::centredLeft);
-                titoloSezione[i].setColour(juce::Label::textColourId, juce::Colour(0xFF20D065).withAlpha(0.4f));
+                titoloSezione[i].setColour(juce::Label::textColourId, juce::Colour(0xFF20D065).withAlpha(0.7f));
                 addAndMakeVisible(titoloSezione[i]);
             }
     #pragma endregion
@@ -136,11 +149,11 @@ StringUIdemoAudioProcessorEditor::StringUIdemoAudioProcessorEditor(StringUIdemoA
                     if (nomiManopole[i] == "Time") {
                         manopolaEffetto[i].setTextValueSuffix(" s");
                     }
-                    else if (nomiManopole[i] == "P. Rate") {
+                    else if (nomiManopole[i] == "Rate") {
                         manopolaEffetto[i].setTextValueSuffix(" Hz");
                     }
                     else if (nomiManopole[i] != "Drive" && nomiManopole[i] != "Gain" &&
-                        nomiManopole[i] != "Hardness" && nomiManopole[i] != "P. Depth") {
+                        nomiManopole[i] != "Hardness" && nomiManopole[i] != "Depth") {
                         // Per esclusione (Feedback, Damping, Sustain, Mix vari)
                         manopolaEffetto[i].setTextValueSuffix(" %");
                     }
@@ -260,7 +273,7 @@ void StringUIdemoAudioProcessorEditor::timerCallback()
 			juce::String nomeNota = juce::MidiMessage::getMidiNoteName(midiNote, true, true, 3);
 
             // Aggiorno la label di conseguenza
-            notaSuonataLabel.setText("Nota: " + nomeNota + "  Tasto: " + juce::String(fret),
+            notaSuonataLabel.setText("Note: " + nomeNota + "  Fret: " + juce::String(fret),
 				juce::dontSendNotification);
 
             #pragma endregion
@@ -305,7 +318,7 @@ void StringUIdemoAudioProcessorEditor::paint(juce::Graphics& g)
     g.fillAll(juce::Colour(0xFF08080A));
 
     //SetTitle(g);
-    SetLineaSeparatrice(g);
+    //SetLineaSeparatrice(g);
     SetStrings(g);
     SetSeparationFret(g);
 
@@ -382,6 +395,9 @@ void StringUIdemoAudioProcessorEditor::resized()
     // Calcola quanto la finestra è stata ingrandita o rimpicciolita
     float scale = (float)getWidth() / 750.0f;
 
+    // Stringe l'area totale di 15 pixel a destra/sinistra e 10 pixel sopra/sotto (moltiplicati per la scala)
+    area = area.reduced(15 * scale, 10 * scale);
+
     #pragma region Area corde scalata
         // Area corde scalata
         int stringH = 17 * scale;
@@ -405,7 +421,7 @@ void StringUIdemoAudioProcessorEditor::resized()
             bottomArea.removeFromTop(gap);
 
             auto tuningRow = row.removeFromLeft(scaledTuningPanelWidth);
-            row.removeFromRight(rightMargin);
+            row.removeFromRight(4 * scale);
             stringComponents.getUnchecked(i)->setBounds(row);
 
             int btnW = 22 * scale;
@@ -427,25 +443,40 @@ void StringUIdemoAudioProcessorEditor::resized()
 
     #pragma region Area superiore scalata
 
-        // Setup area superiore scalata
-        area.removeFromTop(30 * scale); // Rimuove lo spazio per il titolo principale
+        // 1. Spingiamo tutto il blocco superiore verso l'alto (sfruttando lo spazio del vecchio titolo)
+        area.removeFromTop(5 * scale);
 
-        // Creiamo una "Toolbar" orizzontale sopra le corde
-        auto toolbarArea = area.removeFromBottom(30 * scale);
+        // 2. Creiamo un cuscinetto per alzare la toolbar dai tasti delle corde sottostanti
+        area.removeFromBottom(12 * scale);
 
-        // Reset Button a Sinistra (allineato con la colonna dell'accordatura)
-        auto resetArea = toolbarArea.removeFromLeft(scaledTuningPanelWidth);
-        resetTuningButton.setBounds(resetArea.withSizeKeepingCentre(45 * scale, 15 * scale));
+        // 3. Ritagliamo l'area della toolbar (più snella ed elegante)
+        auto toolbarArea = area.removeFromBottom(22 * scale);
 
-        // Preset Menu a Destra (con un po' di margine dal bordo per non attaccarlo)
-        auto presetArea = toolbarArea.removeFromRight(150 * scale).reduced(5 * scale, 7 * scale);
-        presetMenu.setBounds(presetArea);
+        // 4. Creiamo il gap per separare gli effetti dalla toolbar
+        area.removeFromBottom(15 * scale);
 
-        // Nota Suonata al Centro (prende tutto lo spazio rimanente tra il Reset e i Preset)
-        notaSuonataLabel.setBounds(toolbarArea);
-        notaSuonataLabel.setFont(juce::FontOptions(12.0f * scale));
+        // --- ALLINEAMENTO SINISTRA (Reset) ---
+        // I tasti '-' distano esattamente 4 * scale dal bordo sinistro. Usiamo la stessa X.
+        int resetW = 55 * scale;
+        resetTuningButton.setBounds(toolbarArea.getX() + (4 * scale), toolbarArea.getY(), resetW, toolbarArea.getHeight());
 
-        // Divisione Principale: 1/3 a Sinistra, 2/3 a Destra
+        // --- ALLINEAMENTO DESTRA (Preset Menu) ---
+        // L'ultimo fret (fine corde) dista esattamente 10 * scale dal bordo destro (il rightMargin). 
+        int presetW = 130 * scale;
+        int fretRightEdge = toolbarArea.getRight() - (10 * scale);
+        presetMenu.setBounds(toolbarArea.getRight() - presetW - (2 * scale), toolbarArea.getY(), presetW, toolbarArea.getHeight());
+
+        // --- CENTRO (Nota Suonata) ---
+        // La facciamo partire esattamente alla coordinata X del primo fret
+        int noteX = toolbarArea.getX() + scaledTuningPanelWidth;
+
+        // La larghezza prende tutto lo spazio fino al menu Default
+        int noteW = presetMenu.getX() - noteX;
+
+        notaSuonataLabel.setBounds(noteX, toolbarArea.getY(), noteW, toolbarArea.getHeight());
+        notaSuonataLabel.setFont(juce::FontOptions(13.0f * scale, juce::Font::bold));
+
+        // Divisione Principale: 1/5 a Sinistra, 4/5 a Destra
         auto leftArea = area.removeFromLeft(area.getWidth() / 5);
         auto rightArea = area;
 
@@ -542,8 +573,7 @@ void StringUIdemoAudioProcessorEditor::resized()
         for (int i = 0; i < numManopole; ++i)
         {
             // Centriamo la manopola nella sua cella usando la dimensione fissa
-            auto bounds = celle[i].withSizeKeepingCentre(uniformKnobSize, uniformKnobSize).translated(0, 8 * scale);
-            manopolaEffetto[i].setBounds(bounds);
+            auto bounds = celle[i].withSizeKeepingCentre(uniformKnobSize, uniformKnobSize).translated(0, -1 * scale);            manopolaEffetto[i].setBounds(bounds);
 
             // Grandezza della casella di testo col numero sotto la manopola
             manopolaEffetto[i].setTextBoxStyle(juce::Slider::TextBoxBelow, false, 37 * scale, 13 * scale);
@@ -594,21 +624,26 @@ void StringUIdemoAudioProcessorEditor::resized()
     #pragma endregion
 
     #pragma region Sezione oscilloscopio
-			// Setup Oscilloscopio
-            // Parametri dell'onda visualizzata
-            oscilloscopio.setBufferSize(1024);
-            oscilloscopio.setSamplesPerBlock(128);
-            oscilloscopio.setRepaintRate(120); // Aggiornamento a 120 FPS
+        // Setup Oscilloscopio
+    // Raddoppiamo i valori per avere una visualizzazione dell'onda più ampia e fluida
+        oscilloscopio.setBufferSize(2048);
+        oscilloscopio.setSamplesPerBlock(256);
 
-            audioProcessor.puntatoreOscilloscopio = &oscilloscopio;
+        // 60 FPS sono più che sufficienti per l'occhio e dimezzano il carico sulla CPU
+        oscilloscopio.setRepaintRate(60);
 
-            // Colori: Sfondo e Colore dell'Onda
-            oscilloscopio.setColours(juce::Colour(0xFF08080A), juce::Colour(0xFF20D065));
-            oscilloscopio.setOpaque(true); // Per migliorare le prestazioni, dato che disegniamo tutto lo sfondo
-            addAndMakeVisible(oscilloscopio);
+        audioProcessor.puntatoreOscilloscopio = &oscilloscopio;
 
-            // Posizionamento dell'oscilloscopio
-            oscilloscopio.setBounds(workOsc.reduced(10 * scale));    
+        // Sfondo completamente trasparente e onda verde brillante
+        oscilloscopio.setColours(juce::Colours::transparentBlack, juce::Colour(0xFF28FF5A));
+
+        // Spegniamo l'opacità per far trasparire il "glow" del pannello disegnato nel paint()
+        oscilloscopio.setOpaque(false);
+
+        addAndMakeVisible(oscilloscopio);
+
+        // Posizionamento dell'oscilloscopio
+        oscilloscopio.setBounds(workOsc.reduced(10 * scale));
     #pragma endregion
 }
 
@@ -638,7 +673,7 @@ void StringUIdemoAudioProcessorEditor::handleMouseEvent(const juce::MouseEvent& 
                 oldMidiNote = midiNote;
 
                 juce::String nomeNota = juce::MidiMessage::getMidiNoteName(midiNote, true, true, 3);
-                notaSuonataLabel.setText("Nota: " + nomeNota + "  Tasto: " + juce::String(posFret),
+                notaSuonataLabel.setText("Note: " + nomeNota + "  Fret: " + juce::String(posFret),
                     juce::dontSendNotification);
 
                 sc->stringPlucked(relPos);
@@ -714,29 +749,44 @@ void StringUIdemoAudioProcessorEditor::SetStrings(juce::Graphics& g)
     // quindi qui disegniamo solo una eventuale riga di sfondo per le corde
     for (int i = 0; i < StringUIdemoAudioProcessor::numStrings; ++i)
     {
-        auto* sc = stringComponents.getUnchecked(i);
+        /*auto* sc = stringComponents.getUnchecked(i);
         g.setColour(stringColour(i).withAlpha(0.08f));
-        g.fillRect(sc->getX(), sc->getY(), sc->getWidth(), sc->getHeight());
+        g.fillRect(sc->getX(), sc->getY(), sc->getWidth(), sc->getHeight());*/
     }
 }
 
 void StringUIdemoAudioProcessorEditor::SetSeparationFret(juce::Graphics& g)
 {
-    auto* sc = stringComponents.getUnchecked(0);
+    // 1. Prendiamo i riferimenti esatti della prima e dell'ultima corda
+    auto* primaCorda = stringComponents.getUnchecked(0);
+    auto* ultimaCorda = stringComponents.getUnchecked(StringUIdemoAudioProcessor::numStrings - 1);
 
-    float startX = (float)sc->getX();
-    float width = (float)sc->getWidth();
+    float startX = (float)primaCorda->getX();
+    float width = (float)primaCorda->getWidth();
     float fretW = width / (float)numFret;
 
-    g.setColour(juce::Colour(0xFFA88CEC));
+    // 2. Calcoliamo la coordinata Y del centro esatto della prima e dell'ultima corda
+    int yIniziale = primaCorda->getBounds().getCentreY();
+    int yFinale = ultimaCorda->getBounds().getCentreY();
 
+    // 3. Definiamo quanto "scarto" (margine) dare in modo identico sia sopra che sotto (es. 12 pixel)
+    int margine = 12;
+
+    // 4. Calcoliamo Y di partenza e altezza totale
+    int startY = yIniziale - margine;
+    int altezzaTotale = (yFinale - yIniziale) + (margine * 2);
+
+    g.setColour(juce::Colours::lightgrey.withAlpha(0.5f));
+
+    // 5. Disegnamo i fret
     for (int i = 0; i <= numFret; ++i)
     {
         float x = startX + i * fretW;
-        g.fillRect((int)x, sc->getY(), 3, sc->getHeight() * (numCorde + 1));
+        g.fillRect((int)x, startY, 3, altezzaTotale);
     }
-#pragma endregion
 }
+#pragma endregion
+
 
 #pragma region Funzione per preset
 void StringUIdemoAudioProcessorEditor::applicaPreset(int presetId)

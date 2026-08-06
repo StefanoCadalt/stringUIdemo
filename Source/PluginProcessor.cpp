@@ -364,13 +364,13 @@ void StringUIdemoAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer,
             for (int ch = 0; ch < buffer.getNumChannels(); ++ch) 
             {
                 // Accedo tramite puntatore al buffer del canale
-                auto* channelData = buffer.getWritePointer(ch);
+                auto* tempChannelData = buffer.getWritePointer(ch);
 
                 // Quindi applico la distorsione sample per sample nel buffer del canale
                 for (int numSample = 0; numSample < buffer.getNumSamples(); ++numSample) 
                 {
                     // Soft Clipping via tangente iperbolica.
-                    channelData[numSample] = std::tanh(channelData[numSample] * appliedDrive) * currentGain;
+                    tempChannelData[numSample] = std::tanh(tempChannelData[numSample] * appliedDrive) * currentGain;
                 }
             }
         }
@@ -412,7 +412,7 @@ void StringUIdemoAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer,
             // Ciclo sui canali (L e R)
             for (int ch = 0; ch < buffer.getNumChannels(); ++ch)
             {
-                auto* channelData = buffer.getWritePointer(ch);
+                auto* tempChannelData = buffer.getWritePointer(ch);
                 // Assicuriamoci di leggere il canale giusto anche nel delayBuffer
                 auto* delayData = delayBuffer.getWritePointer(ch % delayBuffer.getNumChannels());
 
@@ -430,10 +430,10 @@ void StringUIdemoAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer,
                     float delayedSample = delayData[readPosition];
 
                     // Scriviamo nel "nastro" il suono attuale + l'eco attenuato (Feedback)
-                    delayData[localWritePosition] = channelData[i] + (delayedSample * feedback);
+                    delayData[localWritePosition] = tempChannelData[i] + (delayedSample * feedback);
 
                     // Aggiungiamo l'eco al suono originale in uscita (Mix al 50%)
-                    channelData[i] += delayedSample * 0.5f;
+                    tempChannelData[i] += delayedSample * 0.5f;
 
                     // Avanziamo la testina di scrittura locale di 1 step
                     localWritePosition++;
@@ -506,11 +506,23 @@ void StringUIdemoAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer,
     
 
     // Se è aperta l'interfaccia grafica, passo il buffer all'oscilloscopio per visualizzare le onde sonore
-    if (puntatoreOscilloscopio != nullptr)
-    {
-        // pushBuffer prende l'intero blocco audio e lo disegna
-        puntatoreOscilloscopio->pushBuffer(buffer);
-    }
+        if (puntatoreOscilloscopio != nullptr)
+        {
+            // 1. Prepariamo il buffer visivo (il parametro 'true' evita riallocazioni di memoria pesanti)
+            visualBuffer.setSize(buffer.getNumChannels(), buffer.getNumSamples(), false, false, true);
+
+            // 2. Copiamo i dati canale per canale
+            for (int ch = 0; ch < buffer.getNumChannels(); ++ch)
+            {
+                visualBuffer.copyFrom(ch, 0, buffer, ch, 0, buffer.getNumSamples());
+            }
+
+            // 3. Applichiamo un Gain massiccio (es. x 3.0) SOLO per la grafica
+            visualBuffer.applyGain(1.5f);
+
+            // 4. Passiamo l'onda "ingigantita" all'oscilloscopio
+            puntatoreOscilloscopio->pushBuffer(visualBuffer);
+        }
 }
 
 //==============================================================================

@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
 <JUCERPROJECT id="BXzSlH" name="stringUIdemo" projectType="audioplug" useAppConfig="0"
-              addUsingNamespaceToJuceHeader="0" jucerFormatVersion="1">
+              addUsingNamespaceToJuceHeader="0" jucerFormatVersion="1" pluginCharacteristicsValue="pluginIsSynth">
   <MAINGROUP id="hOrcJ1" name="stringUIdemo">
     <GROUP id="{A79DE33B-E1A9-48C5-ECE5-23BB030320DC}" name="Source">
       <FILE id="I1FuT6" name="ShareTechMono-Regular.ttf" compile="0" resource="1"
