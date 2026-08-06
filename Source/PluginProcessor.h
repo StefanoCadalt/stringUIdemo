@@ -102,6 +102,14 @@ private:
     std::atomic<float>* delayTimeParameter = nullptr;
     std::atomic<float>* delayFbParameter = nullptr;
     std::atomic<float>* masterVolumeParameter = nullptr;
+    // Parametri del Phaser
+    std::atomic<float>* phaserRateParameter = nullptr;
+    std::atomic<float>* phaserDepthParameter = nullptr;
+    std::atomic<float>* phaserMixParameter = nullptr;
+    std::atomic<float>* phaserOnParameter = nullptr;
+
+    // Istanza dell'effetto Phaser (dal modulo DSP di JUCE)
+    juce::dsp::Phaser<float> phaser;
 
     // Puntatori per accensione / spegnimento effetti
 	// Si usano i float come bool perchè l'APVTS gestisce i parametri come float, ma si considerano "on" se >= 0.5f

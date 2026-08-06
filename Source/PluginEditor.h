@@ -32,13 +32,13 @@ public:
 private:
 
     /// Titoli delle sezioni
-    static constexpr int numSezioni = 6;
+    static constexpr int numSezioni = 7;
 	juce::Label titoloSezione[numSezioni];
 
     // Manopole
     KnobStyle stilePomello;
     // 0: Drive, 1: gain
-    static constexpr int numManopole = 10;
+    static constexpr int numManopole = 13;
     juce::Slider manopolaEffetto[numManopole];
     juce::Label titoloManopolaEffetto[numManopole];
 
@@ -52,6 +52,9 @@ private:
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> sustainAttachment;
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> revMixAttachment;
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> revSizeAttachment;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> phaserRateAttachment;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> phaserDepthAttachment;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> phaserMixAttachment;
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> masterAttachment;
 
 	// Callback del Timer (Per interazione Audio Thread -> UI Thread per la MIDI)
@@ -85,6 +88,7 @@ private:
     juce::Rectangle<int> areaDelay;
     juce::Rectangle<int> areaDistortion;
     juce::Rectangle<int> areaReverb;
+    juce::Rectangle<int> areaPhaser;
     juce::Rectangle<int> areaCordeSotto;
 
     // Dati
@@ -131,10 +135,12 @@ private:
     juce::TextButton btnDelayOn{ "ON" };
     juce::TextButton btnDistOn{ "ON" };
     juce::TextButton btnRevOn{ "ON" };
+    juce::TextButton btnPhaserOn{ "ON" };
 
     std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> atcDelayOn;
     std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> atcDistOn;
     std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> atcRevOn;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> atcPhaserOn;
 
     // Sezione dei menu a tendina per i preset
     juce::ComboBox presetMenu;
