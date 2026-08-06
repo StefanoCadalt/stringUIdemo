@@ -46,6 +46,10 @@ StringUIdemoAudioProcessor::StringUIdemoAudioProcessor()
 	delayOnParameter = apvts.getRawParameterValue("delayOn");
 	distOnParameter = apvts.getRawParameterValue("distOn");
 	revOnParameter = apvts.getRawParameterValue("revOn");
+    phaserRateParameter = apvts.getRawParameterValue("phaserRate");
+    phaserDepthParameter = apvts.getRawParameterValue("phaserDepth");
+    phaserMixParameter = apvts.getRawParameterValue("phaserMix");
+    phaserOnParameter = apvts.getRawParameterValue("phaserOn");
 
 #pragma endregion
 }
@@ -88,10 +92,15 @@ juce::AudioProcessorValueTreeState::ParameterLayout StringUIdemoAudioProcessor::
     params.push_back(std::make_unique<juce::AudioParameterInt>("delayFb", "Feedback", 0, 95, 50)); // Il feedback arriva massimo a 0.95 per evitare fischi infiniti
     params.push_back(std::make_unique<juce::AudioParameterInt>("masterVolume", "Master Volume", 0, 100, 50));
 
+    params.push_back(std::make_unique<juce::AudioParameterFloat>("phaserRate", "Phaser Rate", 0.1f, 10.0f, 1.0f)); // Hertz
+    params.push_back(std::make_unique<juce::AudioParameterFloat>("phaserDepth", "Phaser Depth", 0.0f, 1.0f, 0.5f));
+    params.push_back(std::make_unique<juce::AudioParameterInt>("phaserMix", "Phaser Mix", 0, 100, 50));
+
     // Aggiungi questi insieme agli altri params.push_back(...)
     params.push_back(std::make_unique<juce::AudioParameterBool>("delayOn", "Delay On", true));
     params.push_back(std::make_unique<juce::AudioParameterBool>("distOn", "Distortion On", true));
     params.push_back(std::make_unique<juce::AudioParameterBool>("revOn", "Reverb On", true));
+    params.push_back(std::make_unique<juce::AudioParameterBool>("phaserOn", "Phaser On", true));
     /*
     * 
     */
@@ -202,7 +211,7 @@ const juce::String StringUIdemoAudioProcessor::getProgramName(int) { return {}; 
 void StringUIdemoAudioProcessor::changeProgramName(int, const juce::String&) {}
 
 //==============================================================================
-void StringUIdemoAudioProcessor::prepareToPlay(double sampleRate, int /*samplesPerBlock*/)
+void StringUIdemoAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
 {
     stringSynths.clear();
 
@@ -223,6 +232,13 @@ void StringUIdemoAudioProcessor::prepareToPlay(double sampleRate, int /*samplesP
     }
     // Inizializza il Sample Rate del riverbero
     reverb.setSampleRate(sampleRate);
+
+    juce::dsp::ProcessSpec spec;
+    spec.sampleRate = sampleRate;
+    spec.maximumBlockSize = samplesPerBlock;
+    spec.numChannels = getTotalNumOutputChannels();
+
+    phaser.prepare(spec);
 }
 
 void StringUIdemoAudioProcessor::releaseResources()
@@ -358,6 +374,27 @@ void StringUIdemoAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer,
                 }
             }
         }
+    #pragma endregion
+
+    #pragma region Aggiunta Phaser
+
+            if (phaserOnParameter->load() >= 0.5f)
+            {
+                // 1. Aggiorniamo i parametri del phaser
+                phaser.setRate(phaserRateParameter->load());
+                phaser.setDepth(phaserDepthParameter->load());
+                // Il mix va normalizzato da 0-100 a 0.0-1.0
+                phaser.setMix(phaserMixParameter->load() / 100.0f);
+
+                // 2. Prepariamo il blocco audio per il modulo DSP di JUCE
+                // Il modulo dsp non accetta direttamente juce::AudioBuffer, ma un AudioBlock
+                juce::dsp::AudioBlock<float> audioBlock(buffer);
+                juce::dsp::ProcessContextReplacing<float> context(audioBlock);
+
+                // 3. Applichiamo l'effetto
+                phaser.process(context);
+            }
+
     #pragma endregion
 
     #pragma region Aggiunta Delay
