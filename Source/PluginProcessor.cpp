@@ -355,8 +355,8 @@ void StringUIdemoAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer,
                     ai nostri puntatori atomici.
                 */
 
-                // (Amplifico al cubo per ottenere un effetto di drive più marcato)
-                float appliedDrive = currentDrive * currentDrive * currentDrive;
+                // (Amplifico al quadrato per ottenere un effetto di drive più marcato)
+                float appliedDrive = currentDrive * currentDrive;
 
             #pragma endregion
 

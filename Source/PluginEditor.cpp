@@ -758,7 +758,7 @@ void StringUIdemoAudioProcessorEditor::applicaPreset(int presetId)
         setParam("delayOn", 1.0f); setParam("distOn", 1.0f); setParam("revOn", 1.0f);
         setParam("phaserRate", 1.0f); setParam("phaserDepth", 0.5f); setParam("phaserMix", 50.0f); setParam("phaserOn", 0.0f);
 
-        setTuning(70, 65, 61, 56, 51, 46);
+        setTuning(76, 71, 67, 62, 57, 52);
         break;
     case 4: // Bass
         setParam("drive", 1.44f); setParam("gain", 0.45f);
