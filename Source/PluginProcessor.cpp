@@ -380,18 +380,18 @@ void StringUIdemoAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer,
 
             if (phaserOnParameter->load() >= 0.5f)
             {
-                // 1. Aggiorniamo i parametri del phaser
+                // Aggiorniamo i parametri del phaser
                 phaser.setRate(phaserRateParameter->load());
                 phaser.setDepth(phaserDepthParameter->load());
                 // Il mix va normalizzato da 0-100 a 0.0-1.0
                 phaser.setMix(phaserMixParameter->load() / 100.0f);
 
-                // 2. Prepariamo il blocco audio per il modulo DSP di JUCE
+                // Prepariamo il blocco audio per il modulo DSP di JUCE
                 // Il modulo dsp non accetta direttamente juce::AudioBuffer, ma un AudioBlock
                 juce::dsp::AudioBlock<float> audioBlock(buffer);
                 juce::dsp::ProcessContextReplacing<float> context(audioBlock);
 
-                // 3. Applichiamo l'effetto
+                // Applichiamo l'effetto
                 phaser.process(context);
             }
 
