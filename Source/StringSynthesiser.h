@@ -1,9 +1,12 @@
+#pragma once
+
 #include <JuceHeader.h>
 
 class StringSynthesiser
 {
 public:
-    StringSynthesiser(double sampleRate, double frequencyInHz,float hardness) : fs(sampleRate),currentHardness(hardness)
+    StringSynthesiser(double sampleRate, double frequencyInHz, float hardness)
+        : fs(sampleRate), currentHardness(hardness)
     {
         doPluckForNextBuffer.set(false);
         maxDelayLength = (size_t)juce::roundToInt(sampleRate / 20.0);
@@ -12,17 +15,9 @@ public:
         setFrequency(frequencyInHz);
     }
 
-    void SetHardness(float h) {
-        currentHardness = juce::jlimit(0.01f, 1.0f, h);
-    }
-
-    void SetDamping(float d) {
-        currentDamping = juce::jlimit(0.0f,1.0f,d);
-    }
-
-    void SetSustain(float s) {
-        currentSustain = juce::jlimit(0.0f, 1.0f, s);
-    }
+    void SetHardness(float h) { currentHardness = juce::jlimit(0.01f, 1.0f, h); }
+    void SetDamping(float d) { currentDamping = juce::jlimit(0.0f, 1.0f, d); }
+    void SetSustain(float s) { currentSustain = juce::jlimit(0.0f, 1.0f, s); }
 
     void stringPlucked(float pluckPosition)
     {
@@ -42,15 +37,15 @@ public:
         {
             auto nextPos = (pos + 1) % currentDelayLength;
 
-            // 1) filtro di damping (passa-basso)
+            // 1. Filtro di damping (passa-basso del primo ordine)
             float filtered = delayLine[pos] * (1.0f - dampCoeff) + delayLine[nextPos] * dampCoeff;
 
-            // 2) allpass per il fractional delay (intonazione fine)
+            // 2. Allpass filter per fractional delay (intonazione fine Jaffe-Smith)
             float allpassOut = allpassCoeff * filtered + allpassInputPrec - allpassCoeff * allpassOutputPrec;
-            allpassInputPrec = filtered; // aggiorno valore input precedente allpass
-            allpassOutputPrec = allpassOut; // aggiorno valore output precedente allpass
+            allpassInputPrec = filtered;
+            allpassOutputPrec = allpassOut;
 
-            // 3) feedback nel buffer
+            // 3. Feedback gain e scrittura nel delay buffer
             delayLine[nextPos] = allpassOut * feedbackGain;
 
             outBuffer[i] += delayLine[pos];
@@ -64,49 +59,44 @@ public:
         size_t N = (size_t)std::floor(exactDelay);
         float frac = (float)(exactDelay - (double)N);
 
-        // l'allpass gestisce la frazione, quindi il buffer usa solo la parte intera
         currentDelayLength = juce::jlimit((size_t)2, maxDelayLength, N);
 
-        // coefficiente allpass (Jaffe-Smith)
+        // Coefficiente allpass per interpolazione frazionaria (Jaffe-Smith)
         allpassCoeff = (1.0f - frac) / (1.0f + frac);
 
         pos = 0;
         allpassInputPrec = 0.0f;
         allpassOutputPrec = 0.0f;
+
         generateExcitation();
     }
 
 private:
-
-    /// <summary>
-    /// Riempie excitationSample con un buffer di rumore che simula il colpo iniziale sulla corda 
-    /// Il "burst" di energia che poi il delay line di Karplus-Strong fa rimbalzare in loop.
-    /// </summary>
-    void generateExcitation() {
+#pragma region DSP Internals
+    // Genera il burst di rumore (impulso di eccitazione) e applica il low-pass shaping in base all'hardness
+    void generateExcitation()
+    {
         float lastSample = 0.0f;
         float maxVal = 0.0f;
 
         for (size_t i = 0; i < currentDelayLength; ++i)
         {
-            //genera rumore bianco casuale tra -1 e 1 (ogni campione è indipendente dal precedente)
+            // Generazione white noise [-1.0, 1.0]
             float noise = (juce::Random::getSystemRandom().nextFloat() * 2.0f) - 1.0f;
-            //media pesata tra il campione nuovo e il precedente
-            //dove 1 = plettro e 0 = dito
-            //un po' come un filtro passa-basso di primo ordine
-            //dove più l'hardness è bassa e più taglia gli acuti
+
+            // Shaping pass-basso (Hardness: 1.0 = plettro rigido -> 0.0 = dito morbido)
             float shaped = noise * currentHardness + lastSample * (1.0f - currentHardness);
             excitationSample[i] = shaped;
-            //tengo traccia del valore precedente (per il filtro)
+
             lastSample = shaped;
-            //e del valore massimo raggiunto per la normalizzazione
             maxVal = std::max(maxVal, std::abs(shaped));
         }
 
-        //normalizzo per evitare l'abbassamento di volume
+        // Normalizzazione del picco dell'impulso
         if (maxVal > 0.0f)
         {
             for (size_t i = 0; i < currentDelayLength; ++i)
-                excitationSample[i] /= maxVal;//divido il buffer per il valore massimo così da avere il picco sempre a 1 
+                excitationSample[i] /= maxVal;
         }
     }
 
@@ -116,7 +106,9 @@ private:
         for (size_t i = 0; i < currentDelayLength; ++i)
             delayLine[i] = excitationSample[i] * (float)amplitude;
     }
+#pragma endregion
 
+#pragma region Variabili di Stato
     double fs;
     size_t maxDelayLength;
     size_t currentDelayLength = 0;
@@ -135,6 +127,7 @@ private:
     juce::Atomic<int> doPluckForNextBuffer;
     std::vector<float> excitationSample, delayLine;
     size_t pos = 0;
+#pragma endregion
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(StringSynthesiser)
 };

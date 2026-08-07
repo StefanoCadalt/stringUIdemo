@@ -2,8 +2,7 @@
 #include "PluginEditor.h"
 
 // Accordatura standard: E2=64, A2=59, D3=55, G3=50, B3=45, E4=40
-const int ZenkiGuitarModelAudioProcessor::defaultMidiNotes[ZenkiGuitarModelAudioProcessor::numStrings]
-= { 64, 59, 55, 50, 45, 40 };
+const int ZenkiGuitarModelAudioProcessor::defaultMidiNotes[ZenkiGuitarModelAudioProcessor::numStrings] = { 64, 59, 55, 50, 45, 40 };
 
 //==============================================================================
 ZenkiGuitarModelAudioProcessor::ZenkiGuitarModelAudioProcessor()
@@ -19,20 +18,16 @@ ZenkiGuitarModelAudioProcessor::ZenkiGuitarModelAudioProcessor()
 #endif
     , apvts(*this, nullptr, "PARAMETERS", createParameters())
 {
-    // Inizializzazioni utili...
-    for (int i = 0; i < numStrings; ++i) 
+    // Inizializzazione stato corde e flag atomici per la UI
+    for (int i = 0; i < numStrings; ++i)
     {
-        // Inizializzo il tuning corrente con i valori di default
         currentMidiNotes[i] = defaultMidiNotes[i];
-
-        // Inizializzo gli atomic per la UI
         uiStringWasPlucked[i].store(false);
         uiPluckPosition[i].store(0.0f);
     }
 
-#pragma region APVTS parameters
-    // Prendo i riferimenti ai parametri di controllo dell'effettistica dalla APVTS
-    // (da usare in processBlock) (e quindi da dereferenziare)
+#pragma region APVTS Raw Pointers
+    // Binding dei raw pointer per l'accesso thread-safe (lock-free) nel processBlock
     driveParameter = apvts.getRawParameterValue("drive");
     gainParameter = apvts.getRawParameterValue("gain");
     hardnessParameter = apvts.getRawParameterValue("hardness");
@@ -43,77 +38,49 @@ ZenkiGuitarModelAudioProcessor::ZenkiGuitarModelAudioProcessor()
     delayTimeParameter = apvts.getRawParameterValue("delayTime");
     delayFbParameter = apvts.getRawParameterValue("delayFb");
     masterVolumeParameter = apvts.getRawParameterValue("masterVolume");
-	delayOnParameter = apvts.getRawParameterValue("delayOn");
-	distOnParameter = apvts.getRawParameterValue("distOn");
-	revOnParameter = apvts.getRawParameterValue("revOn");
+    delayOnParameter = apvts.getRawParameterValue("delayOn");
+    distOnParameter = apvts.getRawParameterValue("distOn");
+    revOnParameter = apvts.getRawParameterValue("revOn");
     phaserRateParameter = apvts.getRawParameterValue("phaserRate");
     phaserDepthParameter = apvts.getRawParameterValue("phaserDepth");
     phaserMixParameter = apvts.getRawParameterValue("phaserMix");
     phaserOnParameter = apvts.getRawParameterValue("phaserOn");
-
 #pragma endregion
 }
 
 ZenkiGuitarModelAudioProcessor::~ZenkiGuitarModelAudioProcessor() {}
 
-
 //==============================================================================
-
-/// <summary>
-/// Passa all'APVTS i parametri che voglio gestire (di tipo RangedAudioParameter) attraverso un vector di unique_ptr
-/// a tali parametri.s
-/// </summary>
-/// <remarks>
-/// Il metodo ".push_back(...)" aggiunge semplicemente una nuova entrata alla fine del vector.
-/// (Simile ad un ".Add(...)" nelle List<T> di C#)
-/// Tecnicamente la funzione ritorna una tupla di puntatori all'inizio e alla fine del vector.
-/// Sostanzialmete equivale a paasare il vector stesso.
-/// </remarks>
-juce::AudioProcessorValueTreeState::ParameterLayout ZenkiGuitarModelAudioProcessor::createParameters() 
+juce::AudioProcessorValueTreeState::ParameterLayout ZenkiGuitarModelAudioProcessor::createParameters()
 {
-	// Salvo in un vector i puntatori ai parametri che voglio gestire con l'APVTS (da usare in processBlock)
     std::vector<std::unique_ptr<juce::RangedAudioParameter>> params;
 
-	// Attraverso il vector, creo i parametri di controllo dell'effettistica e li aggiungo alla APVTS
-    // (ID, nome, min, max, default)
-    // IMPORTANTE: è qui che si manipolano i parametri della manopola associata, NON dall'editor!
-    // (è una conseguenza dell'impiego dell'APVTS)
-	params.push_back(std::make_unique<juce::AudioParameterFloat>("drive", "Drive", 1.0f, 10.0f, 1.0f));
+    params.push_back(std::make_unique<juce::AudioParameterFloat>("drive", "Drive", 1.0f, 10.0f, 1.0f));
     params.push_back(std::make_unique<juce::AudioParameterFloat>("gain", "Gain", 0.1f, 1.0f, 0.5f));
-    params.push_back(std::make_unique<juce::AudioParameterFloat>("hardness", "Hardness", 0.01f, 1.0f, 0.5f)); //non min = 0 perchè altrimenti si muta l'audio
-    
+    params.push_back(std::make_unique<juce::AudioParameterFloat>("hardness", "Hardness", 0.01f, 1.0f, 0.5f));
+
     params.push_back(std::make_unique<juce::AudioParameterInt>("damping", "Damping", 0, 100, 100));
     params.push_back(std::make_unique<juce::AudioParameterInt>("sustain", "Sustain", 0, 100, 100));
     params.push_back(std::make_unique<juce::AudioParameterInt>("revMix", "Rev Mix", 0, 100, 50));
     params.push_back(std::make_unique<juce::AudioParameterInt>("revSize", "Rev Size", 0, 100, 50));
 
-    params.push_back(std::make_unique<juce::AudioParameterFloat>("delayTime", "Time", 0.01f, 1.5f, 0.4f)); // Time va da 0.01 secondi (slapback) a 1.5 secondi (eco lungo)
-    
-    params.push_back(std::make_unique<juce::AudioParameterInt>("delayFb", "Feedback", 0, 95, 50)); // Il feedback arriva massimo a 0.95 per evitare fischi infiniti
+    params.push_back(std::make_unique<juce::AudioParameterFloat>("delayTime", "Time", 0.01f, 1.5f, 0.4f));
+    params.push_back(std::make_unique<juce::AudioParameterInt>("delayFb", "Feedback", 0, 95, 50));
     params.push_back(std::make_unique<juce::AudioParameterInt>("masterVolume", "Master Volume", 0, 100, 50));
 
-    params.push_back(std::make_unique<juce::AudioParameterFloat>("phaserRate", "Phaser Rate", 0.1f, 10.0f, 1.0f)); // Hertz
+    params.push_back(std::make_unique<juce::AudioParameterFloat>("phaserRate", "Phaser Rate", 0.1f, 10.0f, 1.0f));
     params.push_back(std::make_unique<juce::AudioParameterFloat>("phaserDepth", "Phaser Depth", 0.0f, 1.0f, 0.5f));
     params.push_back(std::make_unique<juce::AudioParameterInt>("phaserMix", "Phaser Mix", 0, 100, 50));
 
-    // Aggiungi questi insieme agli altri params.push_back(...)
     params.push_back(std::make_unique<juce::AudioParameterBool>("delayOn", "Delay On", true));
     params.push_back(std::make_unique<juce::AudioParameterBool>("distOn", "Distortion On", true));
     params.push_back(std::make_unique<juce::AudioParameterBool>("revOn", "Reverb On", true));
     params.push_back(std::make_unique<juce::AudioParameterBool>("phaserOn", "Phaser On", true));
-    /*
-    * 
-    */
 
-	return { params.begin(), params.end() };
+    return { params.begin(), params.end() };
 }
 
 //==============================================================================
-/// <summary>
-/// Suono la corda
-/// </summary>
-/// <param name="stringIndex"></param>
-/// <param name="position"></param>
 void ZenkiGuitarModelAudioProcessor::pluckString(int stringIndex, float position)
 {
     if (stringIndex < 0 || stringIndex >= stringSynths.size())
@@ -130,28 +97,15 @@ void ZenkiGuitarModelAudioProcessor::pluckString(int stringIndex, float position
     synth->stringPlucked(position);
 }
 
-//==============================================================================
-
-/// <summary>
-/// Imposto la stringa accordata a fino a un max e min di 12.
-/// Fa tre cose:
-/// 1) Controllo indice valido.
-/// 2) Limito il tuning.
-/// 3) Aggiorno frequenze nel StringSynthesiser.h
-/// </summary>
-/// <param name="stringIndex"></param>
-/// <param name="newMidiNote"></param>
 void ZenkiGuitarModelAudioProcessor::setStringMidiNote(int stringIndex, int newMidiNote)
 {
     if (stringIndex < 0 || stringIndex >= numStrings)
         return;
 
-    // Limita il tuning a ±tuningRangeSemitones rispetto al default
     int minNote = defaultMidiNotes[stringIndex] - tuningRangeSemitones;
     int maxNote = defaultMidiNotes[stringIndex] + tuningRangeSemitones;
     currentMidiNotes[stringIndex] = juce::jlimit(minNote, maxNote, newMidiNote);
 
-    // Aggiorna subito la frequenza base del synth (senza pizzicare)
     if (stringIndex < stringSynths.size())
     {
         double freqHz = juce::MidiMessage::getMidiNoteInHertz(currentMidiNotes[stringIndex]);
@@ -214,30 +168,28 @@ void ZenkiGuitarModelAudioProcessor::changeProgramName(int, const juce::String&)
 void ZenkiGuitarModelAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
 {
     stringSynths.clear();
-
-    // Inizializzazione Delay
     currentSampleRate = sampleRate;
 
-    // Creiamo un buffer lungo 2 secondi (il massimo tempo possibile + margine)
+    // Inizializzazione Ring Buffer per il Delay (Max 2 secondi)
     int delayBufferSize = (int)(sampleRate * 2.0);
     delayBuffer.setSize(getTotalNumOutputChannels(), delayBufferSize);
-    delayBuffer.clear(); // Svuotiamo la memoria dai "rumori" fantasma
-
+    delayBuffer.clear();
     delayWritePosition = 0;
 
+    // Inizializzazione Motore Karplus-Strong
     for (int i = 0; i < numStrings; ++i)
     {
         double freq = juce::MidiMessage::getMidiNoteInHertz(currentMidiNotes[i]);
         stringSynths.add(new StringSynthesiser(sampleRate, freq, hardnessParameter->load()));
     }
-    // Inizializza il Sample Rate del riverbero
+
+    // Setup DSP Riverbero e Phaser
     reverb.setSampleRate(sampleRate);
 
     juce::dsp::ProcessSpec spec;
     spec.sampleRate = sampleRate;
     spec.maximumBlockSize = samplesPerBlock;
     spec.numChannels = getTotalNumOutputChannels();
-
     phaser.prepare(spec);
 }
 
@@ -265,14 +217,11 @@ bool ZenkiGuitarModelAudioProcessor::isBusesLayoutSupported(const BusesLayout& l
 }
 #endif
 
-void ZenkiGuitarModelAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer,
-    juce::MidiBuffer& midiMessages)
+void ZenkiGuitarModelAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages)
 {
     juce::ScopedNoDenormals noDenormals;
 
-    #pragma region Gestione MIDI
-
-    // Gestione dei messaggi MIDI in arrivo
+#pragma region Gestione MIDI
     for (const auto metadata : midiMessages)
     {
         auto message = metadata.getMessage();
@@ -280,250 +229,256 @@ void ZenkiGuitarModelAudioProcessor::processBlock(juce::AudioBuffer<float>& buff
         if (message.isNoteOn())
         {
             int midiNote = message.getNoteNumber();
-            float velocity = message.getFloatVelocity(); // Forza della plettrata
 
-            // Troviamo quale corda deve suonare questa nota.
-            // La prima corda che può coprire questa nota entro 12 tasti.
+            // Assegnazione della nota alla corda corretta (limite estensione 12 tasti)
             for (int i = 0; i < numStrings; ++i)
             {
                 int openStringNote = currentMidiNotes[i];
                 int fret = midiNote - openStringNote;
 
-                if (fret >= 0 && fret <= 12) // Se la nota è suonabile su questa corda
+                if (fret >= 0 && fret <= 12)
                 {
-                    // Calcoliamo la posizione "virtuale" del tasto (0.0 a 1.0)
-                    // per farla processare alla tua funzione pluckString
                     float position = (float)fret / 12.0f;
-
                     pluckString(i, position);
 
-                    // Comunico tramite le variabili atomic (thread-safe) alla UI
-					// che la corda i è stata pizzicata e qual è la posizione del tasto.
+                    // Aggiornamento atomico per il rendering asincrono in UI
                     uiPluckPosition[i].store(position);
-					uiStringWasPlucked[i].store(true);
-
+                    uiStringWasPlucked[i].store(true);
                     break;
                 }
             }
         }
     }
+#pragma endregion
 
-    #pragma endregion
-
-    #pragma region Generazione Audio & Copia sui Canali
-
+#pragma region Generazione Audio (Karplus-Strong)
     buffer.clear();
-
     float* channelData = buffer.getWritePointer(0);
-    
 
-    for (int i = 0; i < stringSynths.size(); ++i) {
-        // Assegno l'hardness corrente su tutte le corde
+    for (int i = 0; i < stringSynths.size(); ++i)
+    {
         stringSynths.getUnchecked(i)->SetHardness(hardnessParameter->load());
-        // Assegno i valori attuali di damp e sustain
         stringSynths.getUnchecked(i)->SetDamping(dampingParameter->load() / 100.0f);
         stringSynths.getUnchecked(i)->SetSustain(sustainParameter->load() / 100.0f);
+        stringSynths.getUnchecked(i)->generateAndAddData(channelData, buffer.getNumSamples());
     }
 
-	// Genero l'audio per ogni corda e lo sommo al buffer del canale 0 (mono)
-    for (int i = 0; i < stringSynths.size(); ++i)
-        stringSynths.getUnchecked(i)->generateAndAddData(channelData, buffer.getNumSamples());
-
-	// Essendo la chitarra virtuale monofonica, copio il canale 0 (mono) anche sul canale 1 (destro) per avere un output stereo
+    // Duplicazione Canale 0 su Canale 1 (Output Stereo da sorgente Mono)
     for (int ch = 1; ch < buffer.getNumChannels(); ++ch)
         buffer.copyFrom(ch, 0, buffer, 0, 0, buffer.getNumSamples());
+#pragma endregion
 
-    #pragma endregion
+#pragma region DSP: Distorsione (Soft Clipping)
+    if (distOnParameter->load() >= 0.5f)
+    {
+        float currentDrive = driveParameter->load();
+        float currentGain = gainParameter->load();
+        float appliedDrive = currentDrive * currentDrive;
 
-    #pragma region Aggiunta Distorsione
-
-        // Se il parametro "Distortion On" è disattivato, salto tutta la sezione di distorsione
-        if (distOnParameter->load() >= 0.5f)
+        for (int ch = 0; ch < buffer.getNumChannels(); ++ch)
         {
-            #pragma region Variabili di distorsione
-
-                // serve a decidere la ripidità della tangente iperbolica (più alto = più distorto)
-                float currentDrive = driveParameter->load();
-
-                // serve a compensare l'aumento di volume intrinseco dell'operazione di distorsione
-                float currentGain = gainParameter->load();
-
-                /* Nota:
-                    Per accedere ai valori dei parametri non passiamo per l'APVTS (relativamente lento), bensi' ci affidiamo
-                    ai puntatori atomici definiti nel "PluginProcessor.h" e inizializzati nel costruttore.
-                    Ciò è possibile poiché nel costruttore abbiamo passato i puntatori raw (dei parametri della APVTS)
-                    ai nostri puntatori atomici.
-                */
-
-                // (Amplifico al quadrato per ottenere un effetto di drive più marcato)
-                float appliedDrive = currentDrive * currentDrive;
-
-            #pragma endregion
-
-            // Ciclo per ogni canale...
-            for (int ch = 0; ch < buffer.getNumChannels(); ++ch) 
+            auto* tempChannelData = buffer.getWritePointer(ch);
+            for (int numSample = 0; numSample < buffer.getNumSamples(); ++numSample)
             {
-                // Accedo tramite puntatore al buffer del canale
-                auto* tempChannelData = buffer.getWritePointer(ch);
-
-                // Quindi applico la distorsione sample per sample nel buffer del canale
-                for (int numSample = 0; numSample < buffer.getNumSamples(); ++numSample) 
-                {
-                    // Soft Clipping via tangente iperbolica.
-                    tempChannelData[numSample] = std::tanh(tempChannelData[numSample] * appliedDrive) * currentGain;
-                }
+                tempChannelData[numSample] = std::tanh(tempChannelData[numSample] * appliedDrive) * currentGain;
             }
         }
-    #pragma endregion
+    }
+#pragma endregion
 
-    #pragma region Aggiunta Phaser
+#pragma region DSP: Phaser
+    if (phaserOnParameter->load() >= 0.5f)
+    {
+        phaser.setRate(phaserRateParameter->load());
+        phaser.setDepth(phaserDepthParameter->load());
+        phaser.setMix(phaserMixParameter->load() / 100.0f);
 
-            if (phaserOnParameter->load() >= 0.5f)
-            {
-                // Aggiorniamo i parametri del phaser
-                phaser.setRate(phaserRateParameter->load());
-                phaser.setDepth(phaserDepthParameter->load());
-                // Il mix va normalizzato da 0-100 a 0.0-1.0
-                phaser.setMix(phaserMixParameter->load() / 100.0f);
+        juce::dsp::AudioBlock<float> audioBlock(buffer);
+        juce::dsp::ProcessContextReplacing<float> context(audioBlock);
+        phaser.process(context);
+    }
+#pragma endregion
 
-                // Prepariamo il blocco audio per il modulo DSP di JUCE
-                // Il modulo dsp non accetta direttamente juce::AudioBuffer, ma un AudioBlock
-                juce::dsp::AudioBlock<float> audioBlock(buffer);
-                juce::dsp::ProcessContextReplacing<float> context(audioBlock);
+#pragma region DSP: Delay Line
+    if (delayOnParameter->load() >= 0.5f)
+    {
+        float timeInSeconds = delayTimeParameter->load();
+        float feedback = delayFbParameter->load() / 100.0f;
 
-                // Applichiamo l'effetto
-                phaser.process(context);
-            }
+        int delayLengthInSamples = (int)(timeInSeconds * currentSampleRate);
+        int delayBufferLength = delayBuffer.getNumSamples();
 
-    #pragma endregion
-
-    #pragma region Aggiunta Delay
-
-        if (delayOnParameter->load() >= 0.5f)
+        for (int ch = 0; ch < buffer.getNumChannels(); ++ch)
         {
-            // Leggiamo i parametri dalla UI
-            float timeInSeconds = delayTimeParameter->load();
-            float feedback = delayFbParameter->load() / 100.0f;
+            auto* tempChannelData = buffer.getWritePointer(ch);
+            auto* delayData = delayBuffer.getWritePointer(ch % delayBuffer.getNumChannels());
+            int localWritePosition = delayWritePosition;
 
-            // Calcoliamo a quanti "campioni" corrisponde il ritardo in secondi
-            int delayLengthInSamples = (int)(timeInSeconds * currentSampleRate);
-            int delayBufferLength = delayBuffer.getNumSamples();
-
-            // Ciclo sui canali (L e R)
-            for (int ch = 0; ch < buffer.getNumChannels(); ++ch)
+            for (int i = 0; i < buffer.getNumSamples(); ++i)
             {
-                auto* tempChannelData = buffer.getWritePointer(ch);
-                // Assicuriamoci di leggere il canale giusto anche nel delayBuffer
-                auto* delayData = delayBuffer.getWritePointer(ch % delayBuffer.getNumChannels());
+                int readPosition = localWritePosition - delayLengthInSamples;
+                if (readPosition < 0) readPosition += delayBufferLength;
 
-                // Copiamo la posizione di scrittura per questo specifico canale
-                int localWritePosition = delayWritePosition;
+                float delayedSample = delayData[readPosition];
 
-                for (int i = 0; i < buffer.getNumSamples(); ++i)
-                {
-                    // Calcoliamo la testina di lettura (indietro nel tempo rispetto alla scrittura)
-                    int readPosition = localWritePosition - delayLengthInSamples;
-                    if (readPosition < 0)
-                        readPosition += delayBufferLength; // Se andiamo sotto zero, facciamo il giro del ring buffer
+                // Scrittura nel Ring Buffer con Feedback
+                delayData[localWritePosition] = tempChannelData[i] + (delayedSample * feedback);
 
-                    // Prendiamo il campione ritardato (l'eco)
-                    float delayedSample = delayData[readPosition];
+                // 50% Mix fisso
+                tempChannelData[i] += delayedSample * 0.5f;
 
-                    // Scriviamo nel "nastro" il suono attuale + l'eco attenuato (Feedback)
-                    delayData[localWritePosition] = tempChannelData[i] + (delayedSample * feedback);
-
-                    // Aggiungiamo l'eco al suono originale in uscita (Mix al 50%)
-                    tempChannelData[i] += delayedSample * 0.5f;
-
-                    // Avanziamo la testina di scrittura locale di 1 step
-                    localWritePosition++;
-                    if (localWritePosition >= delayBufferLength)
-                        localWritePosition = 0;
-                }
-            }
-
-            // Finito il blocco audio, aggiorniamo la posizione di scrittura globale per il prossimo giro
-            delayWritePosition += buffer.getNumSamples();
-            delayWritePosition %= delayBufferLength;
-        }
-        else
-        {
-		    // Se il delay è spento, assicuriamoci di avanzare comunque la posizione di scrittura per mantenere la coerenza del buffer
-		    delayWritePosition += buffer.getNumSamples();
-		    delayWritePosition %= delayBuffer.getNumSamples();
-        }
-
-    #pragma endregion
-
-    #pragma region Aggiunta Reverb
-
-        if (revOnParameter->load() >= 0.5f)
-        {
-            // Aggiorniamo i parametri del riverbero leggendo i valori dalle manopole
-            float mix = revMixParameter->load() / 100.0f;
-
-            reverbParams.roomSize = revSizeParameter->load() / 100.0f; // Da 0.0 (stanza piccola) a 1.0 (stanza grande)
-            reverbParams.damping = 0.5f;
-            reverbParams.width = 1.0f;   // Massima ampiezza stereo
-
-            // Calcolo Dry/Wet: se Mix è 0, si sente solo la chitarra; se Mix è 1, si sente solo il riverbero
-            reverbParams.dryLevel = 1.0f - mix;
-            reverbParams.wetLevel = mix;
-
-            reverb.setParameters(reverbParams);
-
-            // Applichiamo il riverbero
-            if (buffer.getNumChannels() >= 2)
-            {
-                float* leftChannel = buffer.getWritePointer(0);
-                float* rightChannel = buffer.getWritePointer(1);
-
-				// funzione standard di JUCE per processare un buffer stereo con il riverbero
-                reverb.processStereo(leftChannel, rightChannel, buffer.getNumSamples());
+                localWritePosition++;
+                if (localWritePosition >= delayBufferLength) localWritePosition = 0;
             }
         }
 
-    #pragma endregion
+        delayWritePosition += buffer.getNumSamples();
+        delayWritePosition %= delayBufferLength;
+    }
+    else
+    {
+        // Avanzamento playhead del ring buffer in stato di bypass per preservare la fase
+        delayWritePosition += buffer.getNumSamples();
+        delayWritePosition %= delayBuffer.getNumSamples();
+    }
+#pragma endregion
 
-    #pragma region Applicazione Master Volume
-        float masterVolume = masterVolumeParameter->load() / 100.0f;
-        //Metodo per applicare il volume a tutto il buffer
-        buffer.applyGain(masterVolume); 
-    #pragma endregion
+#pragma region DSP: Riverbero Stereo
+    if (revOnParameter->load() >= 0.5f)
+    {
+        float mix = revMixParameter->load() / 100.0f;
+        reverbParams.roomSize = revSizeParameter->load() / 100.0f;
+        reverbParams.damping = 0.5f;
+        reverbParams.width = 1.0f;
+        reverbParams.dryLevel = 1.0f - mix;
+        reverbParams.wetLevel = mix;
 
-    #pragma region Calcolo livello Meter Volume
-        // Calcoliamo l'RMS per il canale sinistro (0) e lo convertiamo in decibel
-        float rmsLeft = juce::Decibels::gainToDecibels(buffer.getRMSLevel(0, 0, buffer.getNumSamples()));
-        masterRmsLeft.store(rmsLeft);
+        reverb.setParameters(reverbParams);
 
-		// Facciamo lo stesso con il canale destro (1), se esiste
-        if (buffer.getNumChannels() > 1) 
+        if (buffer.getNumChannels() >= 2)
         {
-            float rmsRight = juce::Decibels::gainToDecibels(buffer.getRMSLevel(1, 0, buffer.getNumSamples()));
-            masterRmsRight.store(rmsRight);
+            float* leftChannel = buffer.getWritePointer(0);
+            float* rightChannel = buffer.getWritePointer(1);
+            reverb.processStereo(leftChannel, rightChannel, buffer.getNumSamples());
         }
-    #pragma endregion
-    
+    }
+#pragma endregion
 
-    // Se è aperta l'interfaccia grafica, passo il buffer all'oscilloscopio per visualizzare le onde sonore
-        if (puntatoreOscilloscopio != nullptr)
-        {
-            // 1. Prepariamo il buffer visivo (il parametro 'true' evita riallocazioni di memoria pesanti)
-            visualBuffer.setSize(buffer.getNumChannels(), buffer.getNumSamples(), false, false, true);
+#pragma region Master Stage e Metering
+    buffer.applyGain(masterVolumeParameter->load() / 100.0f);
 
-            // 2. Copiamo i dati canale per canale
-            for (int ch = 0; ch < buffer.getNumChannels(); ++ch)
-            {
-                visualBuffer.copyFrom(ch, 0, buffer, ch, 0, buffer.getNumSamples());
-            }
+    float rmsLeft = juce::Decibels::gainToDecibels(buffer.getRMSLevel(0, 0, buffer.getNumSamples()));
+    masterRmsLeft.store(rmsLeft);
 
-            // 3. Applichiamo un Gain massiccio (es. x 3.0) SOLO per la grafica
-            visualBuffer.applyGain(1.5f);
+    if (buffer.getNumChannels() > 1)
+    {
+        float rmsRight = juce::Decibels::gainToDecibels(buffer.getRMSLevel(1, 0, buffer.getNumSamples()));
+        masterRmsRight.store(rmsRight);
+    }
+#pragma endregion
 
-            // 4. Passiamo l'onda "ingigantita" all'oscilloscopio
-            puntatoreOscilloscopio->pushBuffer(visualBuffer);
-        }
+#pragma region Oscilloscopio
+    if (puntatoreOscilloscopio != nullptr)
+    {
+        visualBuffer.setSize(buffer.getNumChannels(), buffer.getNumSamples(), false, false, true);
+
+        for (int ch = 0; ch < buffer.getNumChannels(); ++ch)
+            visualBuffer.copyFrom(ch, 0, buffer, ch, 0, buffer.getNumSamples());
+
+        // Gain compensativo visivo
+        visualBuffer.applyGain(1.5f);
+        puntatoreOscilloscopio->pushBuffer(visualBuffer);
+    }
+#pragma endregion
 }
+
+//==============================================================================
+#pragma region Gestione Preset Utente (XML)
+juce::File ZenkiGuitarModelAudioProcessor::getPresetsFolder()
+{
+    juce::File appDataDir = juce::File::getSpecialLocation(juce::File::userApplicationDataDirectory);
+    juce::File presetsDir = appDataDir.getChildFile("ZenkiGuitarModel").getChildFile("Presets");
+
+    if (!presetsDir.exists())
+        presetsDir.createDirectory();
+
+    return presetsDir;
+}
+
+void ZenkiGuitarModelAudioProcessor::saveUserPreset(const juce::String& presetName)
+{
+    juce::File presetFile = getPresetsFolder().getChildFile(presetName + ".xml");
+    auto state = apvts.copyState();
+    std::unique_ptr<juce::XmlElement> xml(state.createXml());
+
+    if (xml != nullptr)
+    {
+        // Custom Data: Iniezione Array Accordatura
+        auto* tuningElement = new juce::XmlElement("TUNING");
+        for (int i = 0; i < 6; ++i)
+        {
+            tuningElement->setAttribute("string" + juce::String(i), getStringMidiNote(i));
+        }
+        xml->addChildElement(tuningElement);
+        xml->writeTo(presetFile);
+    }
+}
+
+void ZenkiGuitarModelAudioProcessor::loadUserPreset(const juce::String& presetName)
+{
+    juce::File presetFile = getPresetsFolder().getChildFile(presetName + ".xml");
+    if (presetFile.existsAsFile())
+    {
+        std::unique_ptr<juce::XmlElement> xmlState = juce::XmlDocument::parse(presetFile);
+
+        if (xmlState != nullptr)
+        {
+            apvts.replaceState(juce::ValueTree::fromXml(*xmlState));
+
+            auto* tuningElement = xmlState->getChildByName("TUNING");
+            if (tuningElement != nullptr)
+            {
+                int s0 = tuningElement->getIntAttribute("string0", 60);
+                int s1 = tuningElement->getIntAttribute("string1", 55);
+                int s2 = tuningElement->getIntAttribute("string2", 50);
+                int s3 = tuningElement->getIntAttribute("string3", 45);
+                int s4 = tuningElement->getIntAttribute("string4", 40);
+                int s5 = tuningElement->getIntAttribute("string5", 47);
+
+                setStringMidiNote(0, s0);
+                setStringMidiNote(1, s1);
+                setStringMidiNote(2, s2);
+                setStringMidiNote(3, s3);
+                setStringMidiNote(4, s4);
+                setStringMidiNote(5, s5);
+            }
+        }
+    }
+}
+
+void ZenkiGuitarModelAudioProcessor::deleteUserPreset(const juce::String& presetName)
+{
+    juce::File presetFile = getPresetsFolder().getChildFile(presetName + ".xml");
+    if (presetFile.existsAsFile())
+    {
+        presetFile.deleteFile();
+    }
+}
+
+juce::StringArray ZenkiGuitarModelAudioProcessor::getAvailableUserPresets()
+{
+    juce::StringArray presetNames;
+    juce::File presetsDir = getPresetsFolder();
+    juce::Array<juce::File> presetFiles = presetsDir.findChildFiles(juce::File::findFiles, false, "*.xml");
+
+    for (auto file : presetFiles)
+    {
+        presetNames.add(file.getFileNameWithoutExtension());
+    }
+
+    return presetNames;
+}
+#pragma endregion
 
 //==============================================================================
 bool ZenkiGuitarModelAudioProcessor::hasEditor() const { return true; }
