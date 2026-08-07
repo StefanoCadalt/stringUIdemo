@@ -5,7 +5,7 @@
 #include <atomic>
 
 //==============================================================================
-class StringUIdemoAudioProcessor : public juce::AudioProcessor
+class ZenkiGuitarModelAudioProcessor : public juce::AudioProcessor
 {
 public:
     static const int numStrings = 6;
@@ -37,8 +37,8 @@ public:
 
 
 
-    StringUIdemoAudioProcessor();
-    ~StringUIdemoAudioProcessor() override;
+    ZenkiGuitarModelAudioProcessor();
+    ~ZenkiGuitarModelAudioProcessor() override;
 
     //==========================================================================
     void prepareToPlay(double sampleRate, int samplesPerBlock) override;
@@ -136,5 +136,5 @@ private:
 
     juce::OwnedArray<StringSynthesiser> stringSynths;
 
-    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(StringUIdemoAudioProcessor)
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(ZenkiGuitarModelAudioProcessor)
 };

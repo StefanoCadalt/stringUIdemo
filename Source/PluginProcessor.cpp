@@ -2,11 +2,11 @@
 #include "PluginEditor.h"
 
 // Accordatura standard: E2=64, A2=59, D3=55, G3=50, B3=45, E4=40
-const int StringUIdemoAudioProcessor::defaultMidiNotes[StringUIdemoAudioProcessor::numStrings]
+const int ZenkiGuitarModelAudioProcessor::defaultMidiNotes[ZenkiGuitarModelAudioProcessor::numStrings]
 = { 64, 59, 55, 50, 45, 40 };
 
 //==============================================================================
-StringUIdemoAudioProcessor::StringUIdemoAudioProcessor()
+ZenkiGuitarModelAudioProcessor::ZenkiGuitarModelAudioProcessor()
 #ifndef JucePlugin_PreferredChannelConfigurations
     : AudioProcessor(BusesProperties()
 #if ! JucePlugin_IsMidiEffect
@@ -54,7 +54,7 @@ StringUIdemoAudioProcessor::StringUIdemoAudioProcessor()
 #pragma endregion
 }
 
-StringUIdemoAudioProcessor::~StringUIdemoAudioProcessor() {}
+ZenkiGuitarModelAudioProcessor::~ZenkiGuitarModelAudioProcessor() {}
 
 
 //==============================================================================
@@ -69,7 +69,7 @@ StringUIdemoAudioProcessor::~StringUIdemoAudioProcessor() {}
 /// Tecnicamente la funzione ritorna una tupla di puntatori all'inizio e alla fine del vector.
 /// Sostanzialmete equivale a paasare il vector stesso.
 /// </remarks>
-juce::AudioProcessorValueTreeState::ParameterLayout StringUIdemoAudioProcessor::createParameters() 
+juce::AudioProcessorValueTreeState::ParameterLayout ZenkiGuitarModelAudioProcessor::createParameters() 
 {
 	// Salvo in un vector i puntatori ai parametri che voglio gestire con l'APVTS (da usare in processBlock)
     std::vector<std::unique_ptr<juce::RangedAudioParameter>> params;
@@ -114,7 +114,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout StringUIdemoAudioProcessor::
 /// </summary>
 /// <param name="stringIndex"></param>
 /// <param name="position"></param>
-void StringUIdemoAudioProcessor::pluckString(int stringIndex, float position)
+void ZenkiGuitarModelAudioProcessor::pluckString(int stringIndex, float position)
 {
     if (stringIndex < 0 || stringIndex >= stringSynths.size())
         return;
@@ -141,7 +141,7 @@ void StringUIdemoAudioProcessor::pluckString(int stringIndex, float position)
 /// </summary>
 /// <param name="stringIndex"></param>
 /// <param name="newMidiNote"></param>
-void StringUIdemoAudioProcessor::setStringMidiNote(int stringIndex, int newMidiNote)
+void ZenkiGuitarModelAudioProcessor::setStringMidiNote(int stringIndex, int newMidiNote)
 {
     if (stringIndex < 0 || stringIndex >= numStrings)
         return;
@@ -159,23 +159,23 @@ void StringUIdemoAudioProcessor::setStringMidiNote(int stringIndex, int newMidiN
     }
 }
 
-int StringUIdemoAudioProcessor::getStringMidiNote(int stringIndex) const
+int ZenkiGuitarModelAudioProcessor::getStringMidiNote(int stringIndex) const
 {
     if (stringIndex >= 0 && stringIndex < numStrings)
         return currentMidiNotes[stringIndex];
     return 0;
 }
 
-void StringUIdemoAudioProcessor::resetTuning()
+void ZenkiGuitarModelAudioProcessor::resetTuning()
 {
     for (int i = 0; i < numStrings; ++i)
         setStringMidiNote(i, defaultMidiNotes[i]);
 }
 
 //==============================================================================
-const juce::String StringUIdemoAudioProcessor::getName() const { return JucePlugin_Name; }
+const juce::String ZenkiGuitarModelAudioProcessor::getName() const { return JucePlugin_Name; }
 
-bool StringUIdemoAudioProcessor::acceptsMidi() const
+bool ZenkiGuitarModelAudioProcessor::acceptsMidi() const
 {
 #if JucePlugin_WantsMidiInput
     return true;
@@ -184,7 +184,7 @@ bool StringUIdemoAudioProcessor::acceptsMidi() const
 #endif
 }
 
-bool StringUIdemoAudioProcessor::producesMidi() const
+bool ZenkiGuitarModelAudioProcessor::producesMidi() const
 {
 #if JucePlugin_ProducesMidiOutput
     return true;
@@ -193,7 +193,7 @@ bool StringUIdemoAudioProcessor::producesMidi() const
 #endif
 }
 
-bool StringUIdemoAudioProcessor::isMidiEffect() const
+bool ZenkiGuitarModelAudioProcessor::isMidiEffect() const
 {
 #if JucePlugin_IsMidiEffect
     return true;
@@ -202,16 +202,16 @@ bool StringUIdemoAudioProcessor::isMidiEffect() const
 #endif
 }
 
-double StringUIdemoAudioProcessor::getTailLengthSeconds() const { return 2.0; }
+double ZenkiGuitarModelAudioProcessor::getTailLengthSeconds() const { return 2.0; }
 
-int StringUIdemoAudioProcessor::getNumPrograms() { return 1; }
-int StringUIdemoAudioProcessor::getCurrentProgram() { return 0; }
-void StringUIdemoAudioProcessor::setCurrentProgram(int) {}
-const juce::String StringUIdemoAudioProcessor::getProgramName(int) { return {}; }
-void StringUIdemoAudioProcessor::changeProgramName(int, const juce::String&) {}
+int ZenkiGuitarModelAudioProcessor::getNumPrograms() { return 1; }
+int ZenkiGuitarModelAudioProcessor::getCurrentProgram() { return 0; }
+void ZenkiGuitarModelAudioProcessor::setCurrentProgram(int) {}
+const juce::String ZenkiGuitarModelAudioProcessor::getProgramName(int) { return {}; }
+void ZenkiGuitarModelAudioProcessor::changeProgramName(int, const juce::String&) {}
 
 //==============================================================================
-void StringUIdemoAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
+void ZenkiGuitarModelAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
 {
     stringSynths.clear();
 
@@ -241,13 +241,13 @@ void StringUIdemoAudioProcessor::prepareToPlay(double sampleRate, int samplesPer
     phaser.prepare(spec);
 }
 
-void StringUIdemoAudioProcessor::releaseResources()
+void ZenkiGuitarModelAudioProcessor::releaseResources()
 {
     stringSynths.clear();
 }
 
 #ifndef JucePlugin_PreferredChannelConfigurations
-bool StringUIdemoAudioProcessor::isBusesLayoutSupported(const BusesLayout& layouts) const
+bool ZenkiGuitarModelAudioProcessor::isBusesLayoutSupported(const BusesLayout& layouts) const
 {
 #if JucePlugin_IsMidiEffect
     juce::ignoreUnused(layouts);
@@ -265,7 +265,7 @@ bool StringUIdemoAudioProcessor::isBusesLayoutSupported(const BusesLayout& layou
 }
 #endif
 
-void StringUIdemoAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer,
+void ZenkiGuitarModelAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer,
     juce::MidiBuffer& midiMessages)
 {
     juce::ScopedNoDenormals noDenormals;
@@ -526,17 +526,17 @@ void StringUIdemoAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer,
 }
 
 //==============================================================================
-bool StringUIdemoAudioProcessor::hasEditor() const { return true; }
+bool ZenkiGuitarModelAudioProcessor::hasEditor() const { return true; }
 
-juce::AudioProcessorEditor* StringUIdemoAudioProcessor::createEditor()
+juce::AudioProcessorEditor* ZenkiGuitarModelAudioProcessor::createEditor()
 {
-    return new StringUIdemoAudioProcessorEditor(*this);
+    return new ZenkiGuitarModelAudioProcessorEditor(*this);
 }
 
-void StringUIdemoAudioProcessor::getStateInformation(juce::MemoryBlock&) {}
-void StringUIdemoAudioProcessor::setStateInformation(const void*, int) {}
+void ZenkiGuitarModelAudioProcessor::getStateInformation(juce::MemoryBlock&) {}
+void ZenkiGuitarModelAudioProcessor::setStateInformation(const void*, int) {}
 
 juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter()
 {
-    return new StringUIdemoAudioProcessor();
+    return new ZenkiGuitarModelAudioProcessor();
 }

@@ -2,7 +2,7 @@
 #include "PluginEditor.h"
 
 //==============================================================================
-StringUIdemoAudioProcessorEditor::StringUIdemoAudioProcessorEditor(StringUIdemoAudioProcessor& p)
+ZenkiGuitarModelAudioProcessorEditor::ZenkiGuitarModelAudioProcessorEditor(ZenkiGuitarModelAudioProcessor& p)
     : AudioProcessorEditor(&p), audioProcessor(p)
 {
 
@@ -11,7 +11,7 @@ StringUIdemoAudioProcessorEditor::StringUIdemoAudioProcessorEditor(StringUIdemoA
 
     #pragma region Visibilita sfondo corde
         // Corde visive
-        for (int i = 0; i < StringUIdemoAudioProcessor::numStrings; ++i)
+        for (int i = 0; i < ZenkiGuitarModelAudioProcessor::numStrings; ++i)
         {
             auto* sc = stringComponents.add(new StringComponent(stringColour(i)));
             addAndMakeVisible(sc);
@@ -20,7 +20,7 @@ StringUIdemoAudioProcessorEditor::StringUIdemoAudioProcessorEditor(StringUIdemoA
 
     #pragma region Setup accordatura corde
         // Controlli tuning (uno per corda)
-        for (int i = 0; i < StringUIdemoAudioProcessor::numStrings; ++i)
+        for (int i = 0; i < ZenkiGuitarModelAudioProcessor::numStrings; ++i)
         {
             // Pulsante [−]
             auto* btnDown = tuningDownButtons.add(new juce::TextButton("-"));
@@ -94,6 +94,7 @@ StringUIdemoAudioProcessorEditor::StringUIdemoAudioProcessorEditor(StringUIdemoA
 		presetMenu.addItem("Dream Harp", 2);
 		presetMenu.addItem("Electric", 3);
 		presetMenu.addItem("Bass", 4);
+        presetMenu.addItem("Ghost", 5);
 
 		applicaPreset(1); // Applico il preset di default all'avvio
 
@@ -238,7 +239,7 @@ StringUIdemoAudioProcessorEditor::StringUIdemoAudioProcessorEditor(StringUIdemoA
     #pragma endregion
 }
 
-StringUIdemoAudioProcessorEditor::~StringUIdemoAudioProcessorEditor() 
+ZenkiGuitarModelAudioProcessorEditor::~ZenkiGuitarModelAudioProcessorEditor() 
 {
 	audioProcessor.puntatoreOscilloscopio = nullptr; // Rimuovo il puntatore all'oscilloscopio dal processor
 	stopTimer(); // Ferma il timer quando l'editor viene distrutto
@@ -248,11 +249,11 @@ StringUIdemoAudioProcessorEditor::~StringUIdemoAudioProcessorEditor()
 
 // Override del Callback del timer come specificato in PluginEditor.h
 // Controllo la corda suonata da tastiera MIDI
-void StringUIdemoAudioProcessorEditor::timerCallback() 
+void ZenkiGuitarModelAudioProcessorEditor::timerCallback() 
 {
     // Controllo per ogni corda se la rispettiva flag è stata alzata dall'Audio Thread (processBlock)
 	// Tutto tramite Polling dell'atomic <bool> uiStringWasPlucked[numStrings]
-    for (int i = 0; i < StringUIdemoAudioProcessor::numStrings; ++i) 
+    for (int i = 0; i < ZenkiGuitarModelAudioProcessor::numStrings; ++i) 
     {
         // Check della flag, utilizzando il valore attuale e portandola a false
         if (audioProcessor.uiStringWasPlucked[i].exchange(false)) 
@@ -312,7 +313,7 @@ void StringUIdemoAudioProcessorEditor::timerCallback()
 
 #pragma region paint UI
 
-void StringUIdemoAudioProcessorEditor::paint(juce::Graphics& g)
+void ZenkiGuitarModelAudioProcessorEditor::paint(juce::Graphics& g)
 {
     // Sfondo nero assoluto stile cruscotto digitale
     g.fillAll(juce::Colour(0xFF08080A));
@@ -388,7 +389,7 @@ void StringUIdemoAudioProcessorEditor::paint(juce::Graphics& g)
 
 #pragma region resized UI
 
-void StringUIdemoAudioProcessorEditor::resized()
+void ZenkiGuitarModelAudioProcessorEditor::resized()
 {
     auto area = getLocalBounds();
 
@@ -404,7 +405,7 @@ void StringUIdemoAudioProcessorEditor::resized()
         int gap = 4 * scale;
         int rightMargin = 10 * scale;
         int scaledTuningPanelWidth = tuningPanelWidth * scale;
-        const int totalStrings = StringUIdemoAudioProcessor::numStrings;
+        const int totalStrings = ZenkiGuitarModelAudioProcessor::numStrings;
 
         int stringsAreaH = totalStrings * stringH + (totalStrings - 1) * gap + (16 * scale);
 
@@ -650,7 +651,7 @@ void StringUIdemoAudioProcessorEditor::resized()
 #pragma endregion
 
 //==============================================================================
-void StringUIdemoAudioProcessorEditor::handleMouseEvent(const juce::MouseEvent& e)
+void ZenkiGuitarModelAudioProcessorEditor::handleMouseEvent(const juce::MouseEvent& e)
 {
     for (int i = 0; i < stringComponents.size(); ++i)
     {
@@ -690,13 +691,13 @@ void StringUIdemoAudioProcessorEditor::handleMouseEvent(const juce::MouseEvent& 
 /// Tuning label: mostra nome nota base + delta in semitoni rispetto al default.
 /// Es.: "E2 (+2)" oppure "E2 (-1)" oppure "E2"
 /// </summary>
-void StringUIdemoAudioProcessorEditor::updateTuningLabel(int stringIndex)
+void ZenkiGuitarModelAudioProcessorEditor::updateTuningLabel(int stringIndex)
 {
-    if (stringIndex < 0 || stringIndex >= StringUIdemoAudioProcessor::numStrings)
+    if (stringIndex < 0 || stringIndex >= ZenkiGuitarModelAudioProcessor::numStrings)
         return;
 
     int currentNote = audioProcessor.getStringMidiNote(stringIndex);
-    int defaultNote = StringUIdemoAudioProcessor::defaultMidiNotes[stringIndex];
+    int defaultNote = ZenkiGuitarModelAudioProcessor::defaultMidiNotes[stringIndex];
     int delta = currentNote - defaultNote;
 
     // Nome della nota base (senza numero di ottava nei pulsanti, con ottava nella label)
@@ -714,9 +715,9 @@ void StringUIdemoAudioProcessorEditor::updateTuningLabel(int stringIndex)
     tuningLabels.getUnchecked(stringIndex)->setText(labelText, juce::dontSendNotification);
 }
 
-void StringUIdemoAudioProcessorEditor::updateAllTuningLabels()
+void ZenkiGuitarModelAudioProcessorEditor::updateAllTuningLabels()
 {
-    for (int i = 0; i < StringUIdemoAudioProcessor::numStrings; ++i)
+    for (int i = 0; i < ZenkiGuitarModelAudioProcessor::numStrings; ++i)
         updateTuningLabel(i);
 }
 #pragma endregion
@@ -724,7 +725,7 @@ void StringUIdemoAudioProcessorEditor::updateAllTuningLabels()
 
 //==============================================================================
 #pragma region Metodi disegni UI
-void StringUIdemoAudioProcessorEditor::SetTitle(juce::Graphics& g)
+void ZenkiGuitarModelAudioProcessorEditor::SetTitle(juce::Graphics& g)
 {
     float scale = (float)getWidth() / 750.0f;
 
@@ -735,7 +736,7 @@ void StringUIdemoAudioProcessorEditor::SetTitle(juce::Graphics& g)
     g.drawText("MODELLAZIONE FISICA CHITARRA", 0, 5 * scale, getWidth(), 30 * scale, juce::Justification::centred);      
 }
 
-void StringUIdemoAudioProcessorEditor::SetLineaSeparatrice(juce::Graphics& g)
+void ZenkiGuitarModelAudioProcessorEditor::SetLineaSeparatrice(juce::Graphics& g)
 {
     // Usiamo il bordo dell'areaCordeSotto calcolata nel resized
     float lineaY = areaCordeSotto.getY() - 4.0f;
@@ -743,11 +744,11 @@ void StringUIdemoAudioProcessorEditor::SetLineaSeparatrice(juce::Graphics& g)
     g.drawHorizontalLine((int)lineaY, 10.0f, (float)getWidth() - 10.0f);
 }
 
-void StringUIdemoAudioProcessorEditor::SetStrings(juce::Graphics& g)
+void ZenkiGuitarModelAudioProcessorEditor::SetStrings(juce::Graphics& g)
 {
     // Le etichette testuali (E2, A2...) vengono mostrate dalla tuningLabel,
     // quindi qui disegniamo solo una eventuale riga di sfondo per le corde
-    for (int i = 0; i < StringUIdemoAudioProcessor::numStrings; ++i)
+    for (int i = 0; i < ZenkiGuitarModelAudioProcessor::numStrings; ++i)
     {
         /*auto* sc = stringComponents.getUnchecked(i);
         g.setColour(stringColour(i).withAlpha(0.08f));
@@ -755,11 +756,11 @@ void StringUIdemoAudioProcessorEditor::SetStrings(juce::Graphics& g)
     }
 }
 
-void StringUIdemoAudioProcessorEditor::SetSeparationFret(juce::Graphics& g)
+void ZenkiGuitarModelAudioProcessorEditor::SetSeparationFret(juce::Graphics& g)
 {
     // 1. Prendiamo i riferimenti esatti della prima e dell'ultima corda
     auto* primaCorda = stringComponents.getUnchecked(0);
-    auto* ultimaCorda = stringComponents.getUnchecked(StringUIdemoAudioProcessor::numStrings - 1);
+    auto* ultimaCorda = stringComponents.getUnchecked(ZenkiGuitarModelAudioProcessor::numStrings - 1);
 
     float startX = (float)primaCorda->getX();
     float width = (float)primaCorda->getWidth();
@@ -789,7 +790,7 @@ void StringUIdemoAudioProcessorEditor::SetSeparationFret(juce::Graphics& g)
 
 
 #pragma region Funzione per preset
-void StringUIdemoAudioProcessorEditor::applicaPreset(int presetId)
+void ZenkiGuitarModelAudioProcessorEditor::applicaPreset(int presetId)
 {
     // Creiamo una funzione Lambda interna per cambiare i parametri in una riga
     auto setParam = [this](const juce::String& id, float veroValore)
@@ -834,30 +835,39 @@ void StringUIdemoAudioProcessorEditor::applicaPreset(int presetId)
         setParam("revMix", 100.0f); setParam("revSize", 100.0f);
         setParam("hardness",0.01f); setParam("damping", 100.0f); setParam("sustain", 100.0f);
         setParam("delayOn", 1.0f); setParam("distOn", 1.0f); setParam("revOn", 1.0f);
-        setParam("phaserRate", 1.0f); setParam("phaserDepth", 0.5f); setParam("phaserMix", 50.0f); setParam("phaserOn", 0.0f);
+        setParam("phaserRate", 4.0f); setParam("phaserDepth", 0.8f); setParam("phaserMix", 40.0f); setParam("phaserOn", 1.0f);
 
         setTuning(60, 57, 55, 52, 50, 48);
         break;
     case 3: // Electric
-        setParam("drive", 4.84f); setParam("gain", 0.50f);
-        setParam("delayTime", 0.06f); setParam("delayFb", 6.0f);
+        setParam("drive", 8.6f); setParam("gain", 0.90f);
+        setParam("delayTime", 0.03f); setParam("delayFb", 6.0f);
         setParam("revMix", 15.0f); setParam("revSize", 18.0f);
         setParam("hardness", 0.80f); setParam("damping", 100.0f); setParam("sustain", 100.0f);
         setParam("delayOn", 1.0f); setParam("distOn", 1.0f); setParam("revOn", 1.0f);
-        setParam("phaserRate", 1.0f); setParam("phaserDepth", 0.5f); setParam("phaserMix", 50.0f); setParam("phaserOn", 0.0f);
+        setParam("phaserRate", 2.62f); setParam("phaserDepth", 0.5f); setParam("phaserMix", 20.0f); setParam("phaserOn", 1.0f);
 
-        setTuning(76, 71, 67, 62, 57, 52);
+        setTuning(67, 62, 58, 53, 48, 43);
         break;
     case 4: // Bass
         setParam("drive", 1.44f); setParam("gain", 0.45f);
-        setParam("delayTime", 0.06f); setParam("delayFb", 5.0f);
+        setParam("delayTime", 0.03f); setParam("delayFb", 5.0f);
         setParam("revMix", 0.0f); setParam("revSize", 0.0f);
         setParam("hardness", 0.20f); setParam("damping", 90.0f); setParam("sustain", 80.0f);
         setParam("delayOn", 1.0f); setParam("distOn", 1.0f); setParam("revOn", 0.0f);
-        setParam("phaserRate", 1.0f); setParam("phaserDepth", 0.5f); setParam("phaserMix", 50.0f); setParam("phaserOn", 0.0f);
+        setParam("phaserRate", 1.5f); setParam("phaserDepth", 0.5f); setParam("phaserMix", 40.0f); setParam("phaserOn", 1.0f);
 
-        setTuning(60, 55, 50, 45, 40, 47);
+        setTuning(54, 49, 43, 38, 33, 52);
         break;
+    case 5: // Ghost
+        setParam("drive", 1.6f); setParam("gain", 0.5f);
+        setParam("delayTime", 0.03f); setParam("delayFb", 5.0f);
+        setParam("revMix", 10.0f); setParam("revSize", 20.0f);
+        setParam("hardness", 0.20f); setParam("damping", 100.0f); setParam("sustain", 100.0f);
+        setParam("delayOn", 0.0f); setParam("distOn", 1.0f); setParam("revOn", 1.0f);
+        setParam("phaserRate", 5.05f); setParam("phaserDepth", 0.6f); setParam("phaserMix", 66.0f); setParam("phaserOn", 1.0f);
+
+        setTuning(67, 62, 58, 53, 48, 43);
     default: break;
     }
 }

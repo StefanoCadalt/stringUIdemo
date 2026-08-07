@@ -6,11 +6,11 @@
 #include "KnobStyle.h"
 
 //==============================================================================
-class StringUIdemoAudioProcessorEditor : public juce::AudioProcessorEditor, public juce::Timer
+class ZenkiGuitarModelAudioProcessorEditor : public juce::AudioProcessorEditor, public juce::Timer
 {
 public:
-    explicit StringUIdemoAudioProcessorEditor(StringUIdemoAudioProcessor&);
-    ~StringUIdemoAudioProcessorEditor() override;
+    explicit ZenkiGuitarModelAudioProcessorEditor(ZenkiGuitarModelAudioProcessor&);
+    ~ZenkiGuitarModelAudioProcessorEditor() override;
 
     void paint(juce::Graphics&) override;
     void resized() override;
@@ -92,7 +92,7 @@ private:
     juce::Rectangle<int> areaCordeSotto;
 
     // Dati
-    StringUIdemoAudioProcessor& audioProcessor;
+    ZenkiGuitarModelAudioProcessor& audioProcessor;
 
     juce::OwnedArray<StringComponent> stringComponents;
 
@@ -148,5 +148,5 @@ private:
     // Funzione per applicare i valori
     void applicaPreset(int presetId);
 
-    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(StringUIdemoAudioProcessorEditor)
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(ZenkiGuitarModelAudioProcessorEditor)
 };
