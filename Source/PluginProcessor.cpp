@@ -1,10 +1,12 @@
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
 
-// Accordatura standard: E2=64, A2=59, D3=55, G3=50, B3=45, E4=40
+// Array statico: definisce l'accordatura standard (EADGBE) come base di fallback
 const int ZenkiGuitarModelAudioProcessor::defaultMidiNotes[ZenkiGuitarModelAudioProcessor::numStrings] = { 64, 59, 55, 50, 45, 40 };
 
 //==============================================================================
+// Costruttore: Configura i bus I/O audio (stereo) e aggancia l'APVTS.
+// Inizializza gli stati di base per le corde e per la comunicazione con l'interfaccia.
 ZenkiGuitarModelAudioProcessor::ZenkiGuitarModelAudioProcessor()
 #ifndef JucePlugin_PreferredChannelConfigurations
     : AudioProcessor(BusesProperties()
@@ -18,7 +20,7 @@ ZenkiGuitarModelAudioProcessor::ZenkiGuitarModelAudioProcessor()
 #endif
     , apvts(*this, nullptr, "PARAMETERS", createParameters())
 {
-    // Inizializzazione stato corde e flag atomici per la UI
+    // Reset dello stato vettoriale per le 6 corde e degli atomic flags per la UI
     for (int i = 0; i < numStrings; ++i)
     {
         currentMidiNotes[i] = defaultMidiNotes[i];
@@ -27,7 +29,8 @@ ZenkiGuitarModelAudioProcessor::ZenkiGuitarModelAudioProcessor()
     }
 
 #pragma region APVTS Raw Pointers
-    // Binding dei raw pointer per l'accesso thread-safe (lock-free) nel processBlock
+    // Binding dei raw pointer: essenziale per evitare latenze.
+    // L'APVTS è thread-safe, ma usare questi puntatori evita lock pesanti durante il processBlock.
     driveParameter = apvts.getRawParameterValue("drive");
     gainParameter = apvts.getRawParameterValue("gain");
     hardnessParameter = apvts.getRawParameterValue("hardness");
@@ -51,6 +54,7 @@ ZenkiGuitarModelAudioProcessor::ZenkiGuitarModelAudioProcessor()
 ZenkiGuitarModelAudioProcessor::~ZenkiGuitarModelAudioProcessor() {}
 
 //==============================================================================
+// Definisce l'albero gerarchico dei parametri (ID univoci, nomi in chiaro, range min/max/default).
 juce::AudioProcessorValueTreeState::ParameterLayout ZenkiGuitarModelAudioProcessor::createParameters()
 {
     std::vector<std::unique_ptr<juce::RangedAudioParameter>> params;
@@ -72,6 +76,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout ZenkiGuitarModelAudioProcess
     params.push_back(std::make_unique<juce::AudioParameterFloat>("phaserDepth", "Phaser Depth", 0.0f, 1.0f, 0.5f));
     params.push_back(std::make_unique<juce::AudioParameterInt>("phaserMix", "Phaser Mix", 0, 100, 50));
 
+    // Parametri booleani per gestire l'attivazione (bypass) delle singole catene DSP.
     params.push_back(std::make_unique<juce::AudioParameterBool>("delayOn", "Delay On", true));
     params.push_back(std::make_unique<juce::AudioParameterBool>("distOn", "Distortion On", true));
     params.push_back(std::make_unique<juce::AudioParameterBool>("revOn", "Reverb On", true));
@@ -81,6 +86,8 @@ juce::AudioProcessorValueTreeState::ParameterLayout ZenkiGuitarModelAudioProcess
 }
 
 //==============================================================================
+// Riceve l'input dalla UI (indice corda e posizione del click 0-1) e innesca la simulazione fisica 
+// calcolando la frequenza target in base all'accordatura della singola corda.
 void ZenkiGuitarModelAudioProcessor::pluckString(int stringIndex, float position)
 {
     if (stringIndex < 0 || stringIndex >= stringSynths.size())
@@ -165,25 +172,27 @@ const juce::String ZenkiGuitarModelAudioProcessor::getProgramName(int) { return 
 void ZenkiGuitarModelAudioProcessor::changeProgramName(int, const juce::String&) {}
 
 //==============================================================================
+// Inizializza i buffer e alloca la memoria prima che il processing DSP inizi.
+// Cruciale per evitare allocazioni dinamiche (malloc/new) nel processBlock, che causerebbero glitch audio.
 void ZenkiGuitarModelAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
 {
     stringSynths.clear();
     currentSampleRate = sampleRate;
 
-    // Inizializzazione Ring Buffer per il Delay (Max 2 secondi)
+    // Inizializzazione Ring Buffer per il Delay (Capacità statica fissa di 2 secondi per evitare riallocazioni)
     int delayBufferSize = (int)(sampleRate * 2.0);
     delayBuffer.setSize(getTotalNumOutputChannels(), delayBufferSize);
     delayBuffer.clear();
     delayWritePosition = 0;
 
-    // Inizializzazione Motore Karplus-Strong
+    // Inizializzazione Motore Karplus-Strong per ogni corda indipendente
     for (int i = 0; i < numStrings; ++i)
     {
         double freq = juce::MidiMessage::getMidiNoteInHertz(currentMidiNotes[i]);
         stringSynths.add(new StringSynthesiser(sampleRate, freq, hardnessParameter->load()));
     }
 
-    // Setup DSP Riverbero e Phaser
+    // Setup Moduli DSP JUCE (Riverbero e Phaser)
     reverb.setSampleRate(sampleRate);
 
     juce::dsp::ProcessSpec spec;
@@ -217,11 +226,15 @@ bool ZenkiGuitarModelAudioProcessor::isBusesLayoutSupported(const BusesLayout& l
 }
 #endif
 
+// Cuore del processamento Real-Time. Esegue il routing audio in serie:
+// 1. Parsing MIDI -> 2. Karplus-Strong -> 3. Distorsione -> 4. Phaser -> 5. Delay -> 6. Reverb -> 7. Master.
 void ZenkiGuitarModelAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages)
 {
-    juce::ScopedNoDenormals noDenormals;
+    juce::ScopedNoDenormals noDenormals; // Previene rallentamenti della CPU dovuti a valori in virgola mobile troppo vicini allo zero.
 
 #pragma region Gestione MIDI
+    // Intercetta i messaggi "Note On" (es. da tastiera MIDI) e li dirotta sulla corda virtuale 
+    // appropriata calcolandone il fret in base all'accordatura corrente.
     for (const auto metadata : midiMessages)
     {
         auto message = metadata.getMessage();
@@ -230,7 +243,7 @@ void ZenkiGuitarModelAudioProcessor::processBlock(juce::AudioBuffer<float>& buff
         {
             int midiNote = message.getNoteNumber();
 
-            // Assegnazione della nota alla corda corretta (limite estensione 12 tasti)
+            // Assegnazione euristica: cerca la prima corda su cui la nota rientra nei 12 tasti fisici
             for (int i = 0; i < numStrings; ++i)
             {
                 int openStringNote = currentMidiNotes[i];
@@ -241,7 +254,7 @@ void ZenkiGuitarModelAudioProcessor::processBlock(juce::AudioBuffer<float>& buff
                     float position = (float)fret / 12.0f;
                     pluckString(i, position);
 
-                    // Aggiornamento atomico per il rendering asincrono in UI
+                    // Push asincrono dello stato verso il thread UI per l'animazione grafica
                     uiPluckPosition[i].store(position);
                     uiStringWasPlucked[i].store(true);
                     break;
@@ -252,7 +265,10 @@ void ZenkiGuitarModelAudioProcessor::processBlock(juce::AudioBuffer<float>& buff
 #pragma endregion
 
 #pragma region Generazione Audio (Karplus-Strong)
+    // Svuota il buffer prima di scriverci (previene la permanenza di blocchi audio precedenti)
     buffer.clear();
+
+    // Scrive i dati di sintesi sul canale sinistro (0)
     float* channelData = buffer.getWritePointer(0);
 
     for (int i = 0; i < stringSynths.size(); ++i)
@@ -263,17 +279,18 @@ void ZenkiGuitarModelAudioProcessor::processBlock(juce::AudioBuffer<float>& buff
         stringSynths.getUnchecked(i)->generateAndAddData(channelData, buffer.getNumSamples());
     }
 
-    // Duplicazione Canale 0 su Canale 1 (Output Stereo da sorgente Mono)
+    // Effettua la duplicazione statica: clona l'output mono sul canale destro (1) creando un falso stereo.
     for (int ch = 1; ch < buffer.getNumChannels(); ++ch)
         buffer.copyFrom(ch, 0, buffer, 0, 0, buffer.getNumSamples());
 #pragma endregion
 
 #pragma region DSP: Distorsione (Soft Clipping)
+    // Algoritmo di saturazione (Soft-Clipping) basato su funzione Tangente Iperbolica.
     if (distOnParameter->load() >= 0.5f)
     {
         float currentDrive = driveParameter->load();
         float currentGain = gainParameter->load();
-        float appliedDrive = currentDrive * currentDrive;
+        float appliedDrive = currentDrive * currentDrive; // Risposta esponenziale del controllo drive
 
         for (int ch = 0; ch < buffer.getNumChannels(); ++ch)
         {
@@ -287,11 +304,12 @@ void ZenkiGuitarModelAudioProcessor::processBlock(juce::AudioBuffer<float>& buff
 #pragma endregion
 
 #pragma region DSP: Phaser
+    // Modulazione di fase che sfrutta i moduli ottimizzati JUCE DSP
     if (phaserOnParameter->load() >= 0.5f)
     {
         phaser.setRate(phaserRateParameter->load());
         phaser.setDepth(phaserDepthParameter->load());
-        phaser.setMix(phaserMixParameter->load() / 100.0f);
+        phaser.setMix(phaserMixParameter->load() / 100.0f); // Normalizzazione 0-1
 
         juce::dsp::AudioBlock<float> audioBlock(buffer);
         juce::dsp::ProcessContextReplacing<float> context(audioBlock);
@@ -300,6 +318,7 @@ void ZenkiGuitarModelAudioProcessor::processBlock(juce::AudioBuffer<float>& buff
 #pragma endregion
 
 #pragma region DSP: Delay Line
+    // Implementazione custom di un Ring Buffer per l'effetto di ritardo e retroazione (Feedback)
     if (delayOnParameter->load() >= 0.5f)
     {
         float timeInSeconds = delayTimeParameter->load();
@@ -316,34 +335,36 @@ void ZenkiGuitarModelAudioProcessor::processBlock(juce::AudioBuffer<float>& buff
 
             for (int i = 0; i < buffer.getNumSamples(); ++i)
             {
+                // Determina la "playhead" di lettura andando indietro nel tempo e wrappando gli estremi
                 int readPosition = localWritePosition - delayLengthInSamples;
                 if (readPosition < 0) readPosition += delayBufferLength;
 
                 float delayedSample = delayData[readPosition];
 
-                // Scrittura nel Ring Buffer con Feedback
+                // Scrittura nel Ring Buffer con Feedback cumulativo
                 delayData[localWritePosition] = tempChannelData[i] + (delayedSample * feedback);
 
-                // 50% Mix fisso
+                // Output in uscita combinato al 50% di Dry/Wet
                 tempChannelData[i] += delayedSample * 0.5f;
 
                 localWritePosition++;
                 if (localWritePosition >= delayBufferLength) localWritePosition = 0;
             }
         }
-
+        // Aggiorna la posizione globale per il prossimo Audio Block
         delayWritePosition += buffer.getNumSamples();
         delayWritePosition %= delayBufferLength;
     }
     else
     {
-        // Avanzamento playhead del ring buffer in stato di bypass per preservare la fase
+        // Se l'effetto è spento, è cruciale far avanzare lo stesso la testina per mantenere la coerenza di fase nel tempo.
         delayWritePosition += buffer.getNumSamples();
         delayWritePosition %= delayBuffer.getNumSamples();
     }
 #pragma endregion
 
 #pragma region DSP: Riverbero Stereo
+    // Modulo di spazializzazione JUCE. Opera direttamente sui canali stereo del buffer in mutazione.
     if (revOnParameter->load() >= 0.5f)
     {
         float mix = revMixParameter->load() / 100.0f;
@@ -365,6 +386,7 @@ void ZenkiGuitarModelAudioProcessor::processBlock(juce::AudioBuffer<float>& buff
 #pragma endregion
 
 #pragma region Master Stage e Metering
+    // Controllo guadagno finale ed estrazione dei valori Root Mean Square (RMS) per la barra del volume UI.
     buffer.applyGain(masterVolumeParameter->load() / 100.0f);
 
     float rmsLeft = juce::Decibels::gainToDecibels(buffer.getRMSLevel(0, 0, buffer.getNumSamples()));
@@ -378,6 +400,7 @@ void ZenkiGuitarModelAudioProcessor::processBlock(juce::AudioBuffer<float>& buff
 #pragma endregion
 
 #pragma region Oscilloscopio
+    // Clona il segnale DSP finale in un buffer separato e lo pompa visivamente, inviandolo asincronamente all'UI.
     if (puntatoreOscilloscopio != nullptr)
     {
         visualBuffer.setSize(buffer.getNumChannels(), buffer.getNumSamples(), false, false, true);
@@ -394,6 +417,8 @@ void ZenkiGuitarModelAudioProcessor::processBlock(juce::AudioBuffer<float>& buff
 
 //==============================================================================
 #pragma region Gestione Preset Utente (XML)
+// Utility interne per serializzare l'intero stato APVTS e l'accordatura custom 
+// salvandoli permanentemente in un file XML.
 juce::File ZenkiGuitarModelAudioProcessor::getPresetsFolder()
 {
     juce::File appDataDir = juce::File::getSpecialLocation(juce::File::userApplicationDataDirectory);

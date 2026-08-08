@@ -2,9 +2,15 @@
 
 #include <JuceHeader.h>
 
+//==============================================================================
+// Implementazione del modello fisico di una singola corda vibrante 
+// basata sull'algoritmo di Karplus-Strong con estensione Jaffe-Smith 
+// per l'intonazione fine tramite ritardo frazionario (Allpass filter).
 class StringSynthesiser
 {
 public:
+    // Inizializza il sintetizzatore calcolando la lunghezza massima del buffer 
+    // di ritardo in base a una frequenza minima (es. 20Hz) per evitare riallocazioni.
     StringSynthesiser(double sampleRate, double frequencyInHz, float hardness)
         : fs(sampleRate), currentHardness(hardness)
     {
@@ -19,14 +25,19 @@ public:
     void SetDamping(float d) { currentDamping = juce::jlimit(0.0f, 1.0f, d); }
     void SetSustain(float s) { currentSustain = juce::jlimit(0.0f, 1.0f, s); }
 
+    // Registra la plettrata in modo thread-safe. 
+    // Calcola l'ampiezza dell'eccitazione basata sulla posizione del pizzico (0.0 - 1.0).
     void stringPlucked(float pluckPosition)
     {
         if (doPluckForNextBuffer.compareAndSetBool(1, 0))
             amplitude = std::sin(juce::MathConstants<float>::pi * pluckPosition);
     }
 
+    // Core DSP loop: genera i campioni audio della corda simulata 
+    // e li somma (mix) direttamente nel buffer di uscita fornito.
     void generateAndAddData(float* outBuffer, int numSamples)
     {
+        // Se la corda è stata appena pizzicata, inietta il burst di rumore nel buffer
         if (doPluckForNextBuffer.compareAndSetBool(0, 1))
             exciteInternalBuffer();
 
@@ -53,6 +64,9 @@ public:
         }
     }
 
+    // Calcola la lunghezza esatta del ritardo (in campioni) necessaria per ottenere 
+    // la frequenza desiderata. Divide il valore in una parte intera (buffer size) 
+    // e una parte frazionaria (gestita dal filtro Allpass).
     void setFrequency(double newFrequencyInHz)
     {
         double exactDelay = fs / newFrequencyInHz;
@@ -100,6 +114,8 @@ private:
         }
     }
 
+    // Moltiplica il campione di eccitazione normalizzato per l'ampiezza del pizzico 
+    // e lo scrive nella delay line per dare inizio all'oscillazione.
     void exciteInternalBuffer()
     {
         generateExcitation();

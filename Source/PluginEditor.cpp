@@ -2,13 +2,17 @@
 #include "PluginEditor.h"
 
 //==============================================================================
+// Costruttore dell'Editor UI. Inizializza l'aspetto visivo e stabilisce i collegamenti 
+// (Attachments) tra i componenti grafici e i parametri DSP del processore.
 ZenkiGuitarModelAudioProcessorEditor::ZenkiGuitarModelAudioProcessorEditor(ZenkiGuitarModelAudioProcessor& p)
     : AudioProcessorEditor(&p), audioProcessor(p)
 {
+    // Setup font personalizzato per un look da cruscotto hardware
     juce::Typeface::Ptr customFont = juce::Typeface::createSystemTypefaceFor(BinaryData::ShareTechMonoRegular_ttf, BinaryData::ShareTechMonoRegular_ttfSize);
     juce::LookAndFeel::getDefaultLookAndFeel().setDefaultSansSerifTypeface(customFont);
 
 #pragma region Visibilita sfondo corde
+    // Inizializza i componenti visivi delle 6 corde e li rende parte del layout
     for (int i = 0; i < ZenkiGuitarModelAudioProcessor::numStrings; ++i)
     {
         auto* sc = stringComponents.add(new StringComponent(stringColour(i)));
@@ -17,6 +21,7 @@ ZenkiGuitarModelAudioProcessorEditor::ZenkiGuitarModelAudioProcessorEditor(Zenki
 #pragma endregion
 
 #pragma region Setup accordatura corde
+    // Costruisce i controlli UI per l'accordatura dinamica (pulsanti +/- e label per ogni corda)
     for (int i = 0; i < ZenkiGuitarModelAudioProcessor::numStrings; ++i)
     {
         // Pulsante [−]
@@ -51,7 +56,7 @@ ZenkiGuitarModelAudioProcessorEditor::ZenkiGuitarModelAudioProcessorEditor(Zenki
         addAndMakeVisible(btnUp);
     }
 
-    // Pulsante Reset
+    // Pulsante Reset per riportare istantaneamente tutte le corde all'accordatura standard (EADGBE)
     resetTuningButton.setButtonText("Reset");
     resetTuningButton.setLookAndFeel(&stilePomello);
     resetTuningButton.setColour(juce::TextButton::textColourOffId, juce::Colour(0xFF20D065).withAlpha(0.7f));
@@ -66,6 +71,7 @@ ZenkiGuitarModelAudioProcessorEditor::ZenkiGuitarModelAudioProcessorEditor(Zenki
 #pragma endregion
 
 #pragma region Setup UI e Preset Menu
+    // Setup del display testuale che mostra in tempo reale la nota suonata
     addAndMakeVisible(notaSuonataLabel);
     notaSuonataLabel.setText("Note", juce::NotificationType::dontSendNotification);
     notaSuonataLabel.setFont(juce::FontOptions(13.0f));
@@ -73,6 +79,7 @@ ZenkiGuitarModelAudioProcessorEditor::ZenkiGuitarModelAudioProcessorEditor(Zenki
     notaSuonataLabel.setJustificationType(juce::Justification::centredLeft);
     notaSuonataLabel.setBorderSize(juce::BorderSize<int>(0, 0, 0, 0));
 
+    // Inizializza il menu a tendina per la selezione dei Preset (di fabbrica e utente)
     addAndMakeVisible(presetMenu);
     aggiornaMenuPreset();
     applicaPreset(1);
@@ -93,7 +100,7 @@ ZenkiGuitarModelAudioProcessorEditor::ZenkiGuitarModelAudioProcessorEditor(Zenki
     deletePresetButton.setColour(juce::TextButton::buttonColourId, juce::Colours::transparentBlack);
     deletePresetButton.setColour(juce::TextButton::textColourOffId, juce::Colour(0xFF28FF5A));
 
-    // Callback salvataggio preset
+    // Definisce l'azione di salvataggio di un nuovo preset utente tramite popup modale
     savePresetButton.onClick = [this]()
         {
             auto* alert = new juce::AlertWindow("Salva Preset", "Inserisci il nome del nuovo preset:", juce::AlertWindow::NoIcon);
@@ -123,7 +130,7 @@ ZenkiGuitarModelAudioProcessorEditor::ZenkiGuitarModelAudioProcessorEditor(Zenki
                 }));
         };
 
-    // Callback eliminazione preset
+    // Definisce l'azione di eliminazione del preset utente attualmente selezionato
     deletePresetButton.onClick = [this]()
         {
             int id = presetMenu.getSelectedId();
@@ -138,6 +145,7 @@ ZenkiGuitarModelAudioProcessorEditor::ZenkiGuitarModelAudioProcessorEditor(Zenki
 #pragma endregion
 
 #pragma region Setup Titoli Sezioni
+    // Costruzione delle label per identificare le macro-aree del DSP (Delay, Reverb, ecc.)
     juce::String nomiSezioni[numSezioni] = {
         "OSCILLOSCOPE", "MASTER VOLUME", "PHYSICAL PARAMETERS", "DELAY", "DISTORTION", "PHASER", "REVERB"
     };
@@ -152,6 +160,7 @@ ZenkiGuitarModelAudioProcessorEditor::ZenkiGuitarModelAudioProcessorEditor(Zenki
 #pragma endregion
 
 #pragma region Setup manopole
+    // Inizializza tutti gli slider rotativi e applica formattazioni specifiche (es. unità di misura) in base al parametro
     juce::String nomiManopole[numManopole] = {
         "Time", "Feedback",
         "Drive", "Gain",
@@ -191,9 +200,11 @@ ZenkiGuitarModelAudioProcessorEditor::ZenkiGuitarModelAudioProcessorEditor(Zenki
 #pragma endregion
 
     setSize(1152, 648);
+    // Avvia il loop del timer a 60 FPS per aggiornamenti di UI e Metering indipendenti dall'audio thread
     startTimerHz(60);
 
 #pragma region Setup bottoni On / Off
+    // Setup dei pulsanti di bypass per attivare/disattivare interi blocchi DSP
     juce::TextButton* bypassButtons[] = { &btnDelayOn, &btnDistOn, &btnRevOn, &btnPhaserOn };
 
     for (int i = 0; i < 4; ++i)
@@ -207,6 +218,8 @@ ZenkiGuitarModelAudioProcessorEditor::ZenkiGuitarModelAudioProcessorEditor(Zenki
 #pragma endregion
 
 #pragma region Attachments
+    // Binding bidirezionale tra GUI (Slider/Button) e DSP (APVTS). 
+    // Garantisce che l'UI rifletta automazioni DAW e i controlli influenzino il DSP in modo sicuro.
     timeAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(audioProcessor.apvts, "delayTime", manopolaEffetto[0]);
     feedbackAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(audioProcessor.apvts, "delayFb", manopolaEffetto[1]);
     driveAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(audioProcessor.apvts, "drive", manopolaEffetto[2]);
@@ -230,15 +243,20 @@ ZenkiGuitarModelAudioProcessorEditor::ZenkiGuitarModelAudioProcessorEditor(Zenki
 
 ZenkiGuitarModelAudioProcessorEditor::~ZenkiGuitarModelAudioProcessorEditor()
 {
+    // Scollega esplicitamente il puntatore prima di distruggere l'interfaccia 
+    // per evitare tentativi di accesso del thread audio a memoria non valida (Dangling Pointer).
     audioProcessor.puntatoreOscilloscopio = nullptr;
     stopTimer();
 }
 
 //==============================================================================
 
+// Chiamata periodica asincrona gestita dal thread della UI. Si occupa di aggiornamenti 
+// visivi che non necessitano della priorità o precisione al sample del thread DSP.
 void ZenkiGuitarModelAudioProcessorEditor::timerCallback()
 {
-    // Polling della UI asincrono rispetto all'Audio Thread
+    // Effettua un controllo atomico (senza lock) per verificare se il processBlock
+    // ha segnalato una nota suonata via MIDI, permettendo all'UI di animare la corda corrispondente.
     for (int i = 0; i < ZenkiGuitarModelAudioProcessor::numStrings; ++i)
     {
         if (audioProcessor.uiStringWasPlucked[i].exchange(false))
@@ -264,6 +282,8 @@ void ZenkiGuitarModelAudioProcessorEditor::timerCallback()
 #pragma endregion
 
 #pragma region Lettura Volume Meter
+    // Legge i livelli RMS (calcolati dall'audio thread) in modo thread-safe e mappa
+    // il range in decibel su una scala lineare visiva normalizzata 0.0 - 1.0.
     float rmsL = audioProcessor.masterRmsLeft.load();
     float rmsR = audioProcessor.masterRmsRight.load();
 
@@ -273,6 +293,7 @@ void ZenkiGuitarModelAudioProcessorEditor::timerCallback()
     levelLeftScaled = juce::jlimit(0.0f, 1.0f, newLevelL);
     levelRightScaled = juce::jlimit(0.0f, 1.0f, newLevelR);
 
+    // Forza il repaint mirato solo della porzione di schermo interessata dai meter, ottimizzando le performance grafiche.
     repaint(meterLeftArea.expanded(2));
     repaint(meterRightArea.expanded(2));
 #pragma endregion
@@ -281,6 +302,8 @@ void ZenkiGuitarModelAudioProcessorEditor::timerCallback()
 //==============================================================================
 
 #pragma region paint UI
+// Gestisce il rendering grafico dell'intera interfaccia. Richiamato solo quando necessario 
+// (es. avvio, resize, o repaint esplicito). Non esegue calcoli di layout.
 void ZenkiGuitarModelAudioProcessorEditor::paint(juce::Graphics& g)
 {
     g.fillAll(juce::Colour(0xFF08080A));
@@ -314,10 +337,12 @@ void ZenkiGuitarModelAudioProcessorEditor::paint(juce::Graphics& g)
 #pragma endregion
 
 #pragma region Disegno Volume Meter
+    // Disegna la barra fissa scura di sfondo per i meter L/R.
     g.setColour(juce::Colours::black.withAlpha(0.5f));
     g.fillRoundedRectangle(meterLeftArea.toFloat(), 2.0f);
     g.fillRoundedRectangle(meterRightArea.toFloat(), 2.0f);
 
+    // Applica una sfumatura dinamica (verde -> giallo -> rosso) per indicare l'intensità del segnale.
     juce::ColourGradient meterGrad(
         juce::Colours::red, meterLeftArea.getX(), meterLeftArea.getY(),
         juce::Colours::limegreen, meterLeftArea.getX(), meterLeftArea.getBottom(),
@@ -326,12 +351,14 @@ void ZenkiGuitarModelAudioProcessorEditor::paint(juce::Graphics& g)
     meterGrad.addColour(0.3, juce::Colours::yellow);
     g.setGradientFill(meterGrad);
 
+    // Determina dinamicamente l'altezza del "riempimento" del meter rispetto ai calcoli RMS correnti.
     int heightL = (int)(meterLeftArea.getHeight() * levelLeftScaled);
     int heightR = (int)(meterRightArea.getHeight() * levelRightScaled);
 
     auto localMeterL = meterLeftArea;
     auto localMeterR = meterRightArea;
 
+    // Estrae e disegna solo la porzione inferiore calcolata (il volume vero e proprio).
     auto fillL = localMeterL.removeFromBottom(heightL);
     auto fillR = localMeterR.removeFromBottom(heightR);
 
@@ -342,6 +369,8 @@ void ZenkiGuitarModelAudioProcessorEditor::paint(juce::Graphics& g)
 #pragma endregion
 
 #pragma region resized UI
+// Eseguito automaticamente alla creazione della finestra o in caso di ridimensionamento. 
+// Definisce proporzioni dinamiche (Layout responsive) aggiornando i bound di tutti i componenti.
 void ZenkiGuitarModelAudioProcessorEditor::resized()
 {
     auto area = getLocalBounds();
@@ -362,6 +391,7 @@ void ZenkiGuitarModelAudioProcessorEditor::resized()
     areaCordeSotto = bottomArea;
     bottomArea.removeFromTop(8 * scale);
 
+    // Distribuisce in modo uniforme lo spazio per le stringhe vettoriali e relativi tasti di accordatura.
     for (int i = 0; i < totalStrings; ++i)
     {
         auto row = bottomArea.removeFromTop(stringH);
@@ -415,7 +445,8 @@ void ZenkiGuitarModelAudioProcessorEditor::resized()
     notaSuonataLabel.setBounds(noteX, toolbarArea.getY(), noteW, toolbarArea.getHeight());
     notaSuonataLabel.setFont(juce::FontOptions(13.0f * scale, juce::Font::bold));
 
-    // Suddivisione UI Macro Aree
+    // Suddivisione UI Macro Aree: alloca blocchi logici (Destra/Sinistra e Alto/Basso)
+    // sui quali andranno incastonati manopole e componenti grafici secondari.
     auto leftArea = area.removeFromLeft(area.getWidth() / 5);
     auto rightArea = area;
 
@@ -434,6 +465,7 @@ void ZenkiGuitarModelAudioProcessorEditor::resized()
 #pragma endregion
 
 #pragma region Griglia manopole scalata
+    // Crea copie locali dei bound per preservare le coordinate originali dei quadranti usate nel paint()
     juce::Rectangle<int> celle[13];
 
     auto workOsc = areaOscilloscopio;
@@ -485,6 +517,7 @@ void ZenkiGuitarModelAudioProcessorEditor::resized()
 
     int uniformKnobSize = 45 * scale;
 
+    // Centra ogni manopola all'interno della propria cella logica, preservandone le proporzioni.
     for (int i = 0; i < numManopole; ++i)
     {
         auto bounds = celle[i].withSizeKeepingCentre(uniformKnobSize, uniformKnobSize).translated(0, -1 * scale);
@@ -530,10 +563,12 @@ void ZenkiGuitarModelAudioProcessorEditor::resized()
 #pragma endregion
 
 #pragma region Sezione oscilloscopio
+    // Setta le proprietà del buffer visivo dell'oscilloscopio. Maggiori sample/block garantiscono un segnale più denso.
     oscilloscopio.setBufferSize(2048);
     oscilloscopio.setSamplesPerBlock(256);
     oscilloscopio.setRepaintRate(60);
 
+    // Passa il riferimento all'audioProcessor affinché possa iniettarvi i buffer elaborati dal DSP.
     audioProcessor.puntatoreOscilloscopio = &oscilloscopio;
     oscilloscopio.setColours(juce::Colours::transparentBlack, juce::Colour(0xFF28FF5A));
     oscilloscopio.setOpaque(false);
@@ -544,6 +579,8 @@ void ZenkiGuitarModelAudioProcessorEditor::resized()
 #pragma endregion
 
 //==============================================================================
+// Risponde agli eventi click e drag del mouse. Traduce le coordinate fisiche (X) del cursore 
+// in una posizione relativa per attivare il calcolo dell'accordatura del fret corrispondente.
 void ZenkiGuitarModelAudioProcessorEditor::handleMouseEvent(const juce::MouseEvent& e)
 {
     for (int i = 0; i < stringComponents.size(); ++i)
@@ -568,7 +605,9 @@ void ZenkiGuitarModelAudioProcessorEditor::handleMouseEvent(const juce::MouseEve
                 notaSuonataLabel.setText("Note: " + nomeNota + "  Fret: " + juce::String(posFret),
                     juce::dontSendNotification);
 
+                // Richiesta di aggiornamento visivo al componente corda
                 sc->stringPlucked(relPos);
+                // Trigger sonoro sul motore fisico AudioProcessor
                 audioProcessor.pluckString(i, relPos);
                 break;
             }
@@ -578,6 +617,8 @@ void ZenkiGuitarModelAudioProcessorEditor::handleMouseEvent(const juce::MouseEve
 
 //==============================================================================
 #pragma region Metodi Accordatura
+// Aggiorna logicamente e visivamente le label affiancate ai bottoni di accordatura
+// calcolando il distacco in semitoni (+/-) rispetto all'accordatura standard EADGBE.
 void ZenkiGuitarModelAudioProcessorEditor::updateTuningLabel(int stringIndex)
 {
     if (stringIndex < 0 || stringIndex >= ZenkiGuitarModelAudioProcessor::numStrings)
@@ -631,6 +672,7 @@ void ZenkiGuitarModelAudioProcessorEditor::SetStrings(juce::Graphics& g)
     }
 }
 
+// Rendering dei "tasti" visivi della chitarra tramite calcolo geometrico delle frazioni.
 void ZenkiGuitarModelAudioProcessorEditor::SetSeparationFret(juce::Graphics& g)
 {
     auto* primaCorda = stringComponents.getUnchecked(0);
@@ -658,8 +700,11 @@ void ZenkiGuitarModelAudioProcessorEditor::SetSeparationFret(juce::Graphics& g)
 #pragma endregion
 
 #pragma region Funzione per preset
+// Snodo centrale per l'applicazione dei preset.
+// Interpreta l'ID ricevuto dal menu a tendina e converte la richiesta in modifiche di stato APVTS o chiamate XML.
 void ZenkiGuitarModelAudioProcessorEditor::applicaPreset(int presetId)
 {
+    // Funzione helper isolata (lambda): formatta il passaggio dei dati verso l'APVTS normalizzando i parametri utente a valori tra 0.0 - 1.0.
     auto setParam = [this](const juce::String& id, float veroValore)
         {
             if (auto* param = audioProcessor.apvts.getParameter(id))
@@ -668,6 +713,7 @@ void ZenkiGuitarModelAudioProcessorEditor::applicaPreset(int presetId)
             }
         };
 
+    // Funzione helper isolata (lambda): formatta in batch il set delle 6 intonazioni.
     auto setTuning = [this](int n0, int n1, int n2, int n3, int n4, int n5)
         {
             audioProcessor.setStringMidiNote(0, n0);
@@ -679,12 +725,14 @@ void ZenkiGuitarModelAudioProcessorEditor::applicaPreset(int presetId)
             updateAllTuningLabels();
         };
 
+    // Preset User-Generated (Caricati da XML via disco).
     if (presetId >= 100)
     {
         audioProcessor.loadUserPreset(presetMenu.getText());
         return;
     }
 
+    // Preset Hardcoded (Preset di fabbrica veloci, senza I/O su disco).
     switch (presetId)
     {
     case 1: // Default
@@ -738,14 +786,16 @@ void ZenkiGuitarModelAudioProcessorEditor::applicaPreset(int presetId)
 #pragma endregion
 
 #pragma region Aggiornamento menu preset
+// Scansiona la memoria e il disco per rimpinguare dinamicamente le voci selezionabili nel menu preset.
 void ZenkiGuitarModelAudioProcessorEditor::aggiornaMenuPreset()
 {
     presetMenu.clear();
 
     presetMenu.addItem("Default", 1);
-    presetMenu.addItem("Bass", 2);
+    presetMenu.addItem("Dream Harp", 2);
     presetMenu.addItem("Electric", 3);
-    presetMenu.addItem("Ghost", 4);
+    presetMenu.addItem("Bass", 4);
+    presetMenu.addItem("Ghost", 5);
 
     presetMenu.addSeparator();
 
